@@ -5,6 +5,7 @@ import { GameplayConfig } from '../Core/GameplayConfig';
 import { GameState } from '../Core/GameState';
 import { BuildSpotController } from './BuildSpotController';
 import { EnemyController } from './EnemyController';
+import { MineController } from './MineController';
 import { TowerController } from './TowerController';
 
 const { ccclass, property } = _decorator;
@@ -16,6 +17,9 @@ export class GameController extends Component {
 
     @property(Label)
     public tutorialLabel: Label | null = null;
+
+    @property(Node)
+    public mineNode: Node | null = null;
 
     @property(Node)
     public buildSpotNode: Node | null = null;
@@ -34,11 +38,13 @@ export class GameController extends Component {
 
     private currentState: GameState = GameState.TapMineTutorial;
     private goldAmount = 0;
+    private mineController: MineController | null = null;
     private buildSpotController: BuildSpotController | null = null;
     private towerController: TowerController | null = null;
     private enemyController: EnemyController | null = null;
 
     protected onLoad(): void {
+        this.mineController = this.mineNode?.getComponent(MineController) ?? null;
         this.buildSpotController = this.buildSpotNode?.getComponent(BuildSpotController) ?? null;
         this.towerController = this.towerNode?.getComponent(TowerController) ?? null;
         this.enemyController = this.enemyNode?.getComponent(EnemyController) ?? null;
@@ -46,7 +52,9 @@ export class GameController extends Component {
         GameEventBus.on(GameEvent.MineTapped, this.onMineTapped);
         GameEventBus.on(GameEvent.BuildSpotTapped, this.onBuildSpotTapped);
         GameEventBus.on(GameEvent.EnemyDefeated, this.onEnemyDefeated);
+    }
 
+    protected start(): void {
         this.refreshView();
         this.emitStateChanged();
     }
@@ -116,6 +124,7 @@ export class GameController extends Component {
     private refreshView(): void {
         this.updateGoldLabel();
         this.updateTutorialLabel();
+        this.updateMineView();
         this.updateBuildSpotView();
         this.updateTowerView();
         this.updateEnemyView();
@@ -135,6 +144,11 @@ export class GameController extends Component {
         }
 
         this.tutorialLabel.string = this.getTutorialText();
+    }
+
+    private updateMineView(): void {
+        const isMineStep = this.currentState === GameState.TapMineTutorial;
+        this.mineController?.setHighlightVisible(isMineStep);
     }
 
     private updateBuildSpotView(): void {
