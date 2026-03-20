@@ -8,6 +8,7 @@ import { EnemyController } from './EnemyController';
 import { MineController } from './MineController';
 import { SkillButtonController } from './SkillButtonController';
 import { TowerController } from './TowerController';
+import { VictoryOverlayController } from './VictoryOverlayController';
 
 const { ccclass, property } = _decorator;
 
@@ -43,9 +44,11 @@ export class GameController extends Component {
     @property(Node)
     public skillButtonNode: Node | null = null;
 
+    @property(Node)
+    public victoryOverlayNode: Node | null = null;
+
     private currentState: GameState = GameState.TapMineTutorial;
     private goldAmount = 0;
-    private defeatedEnemiesCount = 0;
 
     private mineController: MineController | null = null;
     private buildSpotController: BuildSpotController | null = null;
@@ -53,6 +56,7 @@ export class GameController extends Component {
     private lightEnemyController: EnemyController | null = null;
     private heavyEnemyController: EnemyController | null = null;
     private skillButtonController: SkillButtonController | null = null;
+    private victoryOverlayController: VictoryOverlayController | null = null;
 
     protected onLoad(): void {
         this.mineController = this.mineNode?.getComponent(MineController) ?? null;
@@ -61,10 +65,12 @@ export class GameController extends Component {
         this.lightEnemyController = this.lightEnemyNode?.getComponent(EnemyController) ?? null;
         this.heavyEnemyController = this.heavyEnemyNode?.getComponent(EnemyController) ?? null;
         this.skillButtonController = this.skillButtonNode?.getComponent(SkillButtonController) ?? null;
+        this.victoryOverlayController = this.victoryOverlayNode?.getComponent(VictoryOverlayController) ?? null;
 
         GameEventBus.on(GameEvent.MineTapped, this.onMineTapped);
         GameEventBus.on(GameEvent.BuildSpotTapped, this.onBuildSpotTapped);
         GameEventBus.on(GameEvent.EnemyDefeated, this.onEnemyDefeated);
+        GameEventBus.on(GameEvent.EnemyReachedGoal, this.onEnemyReachedGoal);
         GameEventBus.on(GameEvent.SkillButtonTapped, this.onSkillButtonTapped);
     }
 
@@ -77,6 +83,7 @@ export class GameController extends Component {
         GameEventBus.off(GameEvent.MineTapped, this.onMineTapped);
         GameEventBus.off(GameEvent.BuildSpotTapped, this.onBuildSpotTapped);
         GameEventBus.off(GameEvent.EnemyDefeated, this.onEnemyDefeated);
+        GameEventBus.off(GameEvent.EnemyReachedGoal, this.onEnemyReachedGoal);
         GameEventBus.off(GameEvent.SkillButtonTapped, this.onSkillButtonTapped);
     }
 
@@ -111,22 +118,32 @@ export class GameController extends Component {
     };
 
     private onEnemyDefeated = (): void => {
-        this.defeatedEnemiesCount += 1;
-
-        if (this.currentState === GameState.BattleOne && this.defeatedEnemiesCount === 1) {
-            this.currentState = GameState.SkillTutorial;
+        if (this.currentState === GameState.BattleOne) {
+            this.currentState = GameState.BattleTwo;
             this.emitStateChanged();
             this.startSecondBattle();
             this.refreshView();
             return;
         }
 
-        if (this.currentState === GameState.SkillTutorial && this.defeatedEnemiesCount === 2) {
+        if (this.currentState === GameState.SkillTutorial) {
             this.currentState = GameState.Victory;
             this.emitStateChanged();
             this.towerController?.stopBattle();
             this.refreshView();
+            this.victoryOverlayController?.show();
         }
+    };
+
+    private onEnemyReachedGoal = (): void => {
+        if (this.currentState !== GameState.BattleTwo) {
+            return;
+        }
+
+        this.currentState = GameState.SkillTutorial;
+        this.emitStateChanged();
+        this.towerController?.stopBattle();
+        this.refreshView();
     };
 
     private onSkillButtonTapped = (): void => {
@@ -134,6 +151,8 @@ export class GameController extends Component {
             return;
         }
 
+        this.skillButtonController?.setInteractionEnabled(false);
+        this.skillButtonController?.setHighlightVisible(false);
         this.heavyEnemyController?.receiveDamage(GameplayConfig.skillDamage);
     };
 
@@ -220,6 +239,7 @@ export class GameController extends Component {
         const isBuildStep = this.currentState === GameState.BuildTowerTutorial;
         const shouldHideBuildSpot =
             this.currentState === GameState.BattleOne ||
+            this.currentState === GameState.BattleTwo ||
             this.currentState === GameState.SkillTutorial ||
             this.currentState === GameState.Victory;
 
@@ -238,6 +258,7 @@ export class GameController extends Component {
 
         this.towerNode.active =
             this.currentState === GameState.BattleOne ||
+            this.currentState === GameState.BattleTwo ||
             this.currentState === GameState.SkillTutorial ||
             this.currentState === GameState.Victory;
     }
@@ -275,11 +296,14 @@ export class GameController extends Component {
             case GameState.BattleOne:
                 return 'Defend the fortress';
 
+            case GameState.BattleTwo:
+                return 'Heavy enemy incoming';
+
             case GameState.SkillTutorial:
                 return 'Use fireball';
 
             case GameState.Victory:
-                return 'Great';
+                return '';
 
             default:
                 return '';
