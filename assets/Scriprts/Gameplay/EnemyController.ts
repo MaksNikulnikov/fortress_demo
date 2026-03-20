@@ -9,7 +9,7 @@ const { ccclass } = _decorator;
 export class EnemyController extends Component {
     private moveTarget: Node | null = null;
     private isMoving = false;
-    private currentHealth = GameplayConfig.enemyMaxHealth;
+    private currentHealth: number = GameplayConfig.lightEnemyMaxHealth;
     private movementDirection = new Vec3();
 
     protected update(deltaTime: number): void {
@@ -38,8 +38,8 @@ export class EnemyController extends Component {
         );
     }
 
-    public startBattle(startNode: Node, endNode: Node): void {
-        this.currentHealth = GameplayConfig.enemyMaxHealth;
+    public startBattle(startNode: Node, endNode: Node, maxHealth: number): void {
+        this.currentHealth = maxHealth;
         this.moveTarget = endNode;
         this.isMoving = true;
         this.node.active = true;

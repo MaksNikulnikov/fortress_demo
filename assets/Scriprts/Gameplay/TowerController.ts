@@ -24,6 +24,8 @@ export class TowerController extends Component {
     public stopBattle(): void {
         this.isBattleActive = false;
         this.attackCooldown = 0;
+        this.enemyNode = null;
+        this.enemyController = null;
     }
 
     protected update(deltaTime: number): void {

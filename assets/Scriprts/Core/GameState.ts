@@ -1,6 +1,7 @@
 export enum GameState {
     TapMineTutorial = 'TapMineTutorial',
     BuildTowerTutorial = 'BuildTowerTutorial',
-    Battle = 'Battle',
+    BattleOne = 'BattleOne',
+    SkillTutorial = 'SkillTutorial',
     Victory = 'Victory',
 }

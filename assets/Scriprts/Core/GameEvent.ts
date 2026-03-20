@@ -3,6 +3,7 @@ export enum GameEvent {
     MineTapped = 'MineTapped',
     BuildSpotTapped = 'BuildSpotTapped',
     EnemyDefeated = 'EnemyDefeated',
+    SkillButtonTapped = 'SkillButtonTapped',
     TutorialUpdated = 'TutorialUpdated',
     StateChanged = 'StateChanged',
 }
