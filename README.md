@@ -37,17 +37,17 @@ The main goal was to show that even a compact playable can still be treated like
 
 ## Publish To GitHub Pages
 
-The repository is set up to publish from `docs/`, so the safest flow is:
+The repository is set up to publish from `docs/`.
 
-1. Build `Web Desktop` in `Cocos Creator`.
-2. Keep the build output in `build/web-desktop`.
-3. Run:
-   `powershell -ExecutionPolicy Bypass -File .\scripts\publish-pages.ps1`
-4. Commit the updated `docs/` folder and push.
+1. Open `Build` in `Cocos Creator`.
+2. Select `Web Desktop`.
+3. Disable `Use Splash Screen`.
+4. Build to your local output folder.
+5. Copy the full build contents into `docs/`.
+6. Keep `docs/.nojekyll` in place.
+7. Commit the updated `docs/` folder and push.
 
-The publish script mirrors the full web build into `docs/`, creates `.nojekyll`, removes the default `Created with Cocos` footer from the page shell, strips the splash configuration from the published build, and patches the generated engine chunk so the runtime never creates the default Cocos splash overlay.
-
-This is important because `GitHub Pages` needs the whole generated build, including `docs/assets/main/native/...`. Copying only `index.html`, `src/`, or part of `assets/` is what causes missing texture errors at runtime.
+This is important because `GitHub Pages` needs the whole generated build, including `docs/assets/main/native/...`. Publishing only `index.html`, `src/`, or part of `assets/` is what causes missing texture errors at runtime.
 
 ## Gameplay Flow
 
