@@ -307,7 +307,7 @@
       "a": 255
     },
     "_spriteFrame": {
-      "__uuid__": "201c6c3b-7f5a-489a-a650-9430f0027455@f9941",
+      "__uuid__": "80c4f2f1-41e0-419c-9cd4-68a9e6ed8528@f9941",
       "__expectedType__": "cc.SpriteFrame"
     },
     "_type": 0,
@@ -1141,6 +1141,7 @@
     "projectileNode": {
       "__id__": 30
     },
+    "statsProfile": 0,
     "attackRange": 260,
     "attackInterval": 0.6,
     "attackDamage": 1,
@@ -1522,6 +1523,7 @@
     "projectileNode": {
       "__id__": 49
     },
+    "statsProfile": 0,
     "attackRange": 600,
     "attackInterval": 0.6,
     "attackDamage": 1,
@@ -2672,6 +2674,7 @@
     "deathAnimationName": "heavy_enemy_death",
     "canAttackAtGoal": true,
     "attackInterval": 0.8,
+    "useGameplayConfigAttackInterval": true,
     "deathFadeDelay": 1,
     "deathFadeDuration": 0.35,
     "_id": "344Mh47AdHl40kxdDgh8T7"
@@ -2701,10 +2704,7 @@
         "__expectedType__": "cc.AnimationClip"
       }
     ],
-    "_defaultClip": {
-      "__uuid__": "1df7bcf2-950f-4051-ada4-f56d40216752",
-      "__expectedType__": "cc.AnimationClip"
-    },
+    "_defaultClip": null,
     "_id": "14cHcvBaRL+5H169uwicH0"
   },
   {
