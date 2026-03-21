@@ -1,0 +1,57 @@
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on:
+      - self-hosted
+      - windows
+      - x64
+    env:
+      COCOS_CREATOR_EXE: ${{ vars.COCOS_CREATOR_EXE }}
+      COCOS_BUILD_PLATFORM: web-desktop
+      PAGES_OUTPUT_DIR: ${{ github.workspace }}\.pages-dist
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Build Cocos project
+        shell: powershell
+        run: >
+          .\scripts\build-pages.ps1
+          -Platform $env:COCOS_BUILD_PLATFORM
+          -OutputPath $env:PAGES_OUTPUT_DIR
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ./.pages-dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

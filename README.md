@@ -47,3 +47,18 @@ The player mines gold, builds a tower, survives a light wave, stops a heavy enem
 ## Portfolio Goal
 
 This repo is meant to present a small but clean gameplay slice rather than a large framework. The emphasis is on readability, responsive UI feedback, simple scene setup, and a presentation-ready gameplay loop.
+
+## GitHub Pages CI
+
+The repository includes a GitHub Actions workflow for Pages deployment in [.github/workflows/pages.yml](.github/workflows/pages.yml).
+
+This workflow is designed for a `self-hosted` Windows runner because the build depends on a local installation of `Cocos Creator 3.8.8`.
+
+Required setup:
+
+1. Register a Windows self-hosted runner for the repository.
+2. Make sure `Cocos Creator 3.8.8` is installed on that runner machine.
+3. In `Settings -> Pages`, set the source to `GitHub Actions`.
+4. Optionally create a repository variable named `COCOS_CREATOR_EXE` if Creator is installed somewhere other than `C:\ProgramData\cocos\editors\Creator\3.8.8\CocosCreator.exe`.
+
+The build step is handled by [scripts/build-pages.ps1](scripts/build-pages.ps1). It tries both official Cocos CLI argument styles, `--project` and `--path`, and publishes the generated web build as the Pages artifact.
