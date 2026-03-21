@@ -7,9 +7,11 @@ import { BuildSpotController } from './BuildSpotController';
 import { EnemyController } from './EnemyController';
 import { FireballController } from './FireballController';
 import { FortressController } from './FortressController';
+import { GoldCounterController } from './GoldCounterController';
 import { MineController } from './MineController';
 import { SkillButtonController } from './SkillButtonController';
 import { TowerController } from './TowerController';
+import { TutorialLabelController } from './TutorialLabelController';
 import { VictoryOverlayController } from './VictoryOverlayController';
 
 const { ccclass, property } = _decorator;
@@ -71,6 +73,8 @@ export class GameController extends Component {
     private skillButtonController: SkillButtonController | null = null;
     private victoryOverlayController: VictoryOverlayController | null = null;
     private fireballController: FireballController | null = null;
+    private tutorialLabelController: TutorialLabelController | null = null;
+    private goldCounterController: GoldCounterController | null = null;
 
     protected onLoad(): void {
         this.mineController = this.mineNode?.getComponent(MineController) ?? null;
@@ -83,6 +87,8 @@ export class GameController extends Component {
         this.skillButtonController = this.skillButtonNode?.getComponent(SkillButtonController) ?? null;
         this.victoryOverlayController = this.victoryOverlayNode?.getComponent(VictoryOverlayController) ?? null;
         this.fireballController = this.fireballNode?.getComponent(FireballController) ?? null;
+        this.tutorialLabelController = this.tutorialLabel?.getComponent(TutorialLabelController) ?? null;
+        this.goldCounterController = this.goldLabel?.getComponent(GoldCounterController) ?? null;
 
         GameEventBus.on(GameEvent.MineTapped, this.onMineTapped);
         GameEventBus.on(GameEvent.BuildSpotTapped, this.onBuildSpotTapped);
@@ -94,7 +100,7 @@ export class GameController extends Component {
     }
 
     protected start(): void {
-        this.refreshView();
+        this.refreshView(true);
         this.emitStateChanged();
     }
 
@@ -167,6 +173,7 @@ export class GameController extends Component {
         this.towerController?.stopBattle();
         this.fortressAttackController?.startBattle(this.heavyEnemyNode as Node);
         this.refreshView();
+        this.skillButtonController?.playShowAnimation();
     };
 
     private onEnemyAttackPerformed = (): void => {
@@ -259,9 +266,9 @@ export class GameController extends Component {
         });
     }
 
-    private refreshView(): void {
+    private refreshView(isInitialRefresh = false): void {
         this.updateGoldLabel();
-        this.updateTutorialLabel();
+        this.updateTutorialLabel(isInitialRefresh);
         this.updateMineView();
         this.updateBuildSpotView();
         this.updateTowerView();
@@ -270,19 +277,50 @@ export class GameController extends Component {
     }
 
     private updateGoldLabel(): void {
+        const shouldShowTarget = this.currentState === GameState.TapMineTutorial;
+
+        if (this.goldCounterController) {
+            this.goldCounterController.updateValue(
+                this.goldAmount,
+                GameplayConfig.goldTargetForTowerBuild,
+                shouldShowTarget
+            );
+            return;
+        }
+
         if (!this.goldLabel) {
             return;
         }
 
-        this.goldLabel.string = `Gold: ${this.goldAmount}`;
+        this.goldLabel.string = shouldShowTarget
+            ? `Gold: ${this.goldAmount}/${GameplayConfig.goldTargetForTowerBuild}`
+            : `Gold: ${this.goldAmount}`;
     }
 
-    private updateTutorialLabel(): void {
+    private updateTutorialLabel(isInitialRefresh: boolean): void {
+        const tutorialText = this.getTutorialText();
+
+        if (this.tutorialLabelController) {
+            if (tutorialText.type === 'persistent') {
+                this.tutorialLabelController.showPersistentText(tutorialText.text);
+            } else if (tutorialText.type === 'temporary') {
+                if (isInitialRefresh) {
+                    this.tutorialLabelController.showTemporaryText(tutorialText.text);
+                } else {
+                    this.tutorialLabelController.showTemporaryText(tutorialText.text);
+                }
+            } else {
+                this.tutorialLabelController.hide();
+            }
+
+            return;
+        }
+
         if (!this.tutorialLabel) {
             return;
         }
 
-        this.tutorialLabel.string = this.getTutorialText();
+        this.tutorialLabel.string = tutorialText.text;
     }
 
     private updateMineView(): void {
@@ -342,31 +380,55 @@ export class GameController extends Component {
         this.skillButtonController?.setHighlightVisible(isSkillStep);
     }
 
-    private getTutorialText(): string {
+    private getTutorialText(): { text: string; type: 'persistent' | 'temporary' | 'hidden' } {
         switch (this.currentState) {
             case GameState.TapMineTutorial:
-                return 'Tap the mine';
+                return {
+                    text: `Tap the mine ${this.goldAmount}/${GameplayConfig.goldTargetForTowerBuild}`,
+                    type: 'persistent',
+                };
 
             case GameState.BuildTowerTutorial:
-                return 'Build the tower';
+                return {
+                    text: 'Build the tower',
+                    type: 'persistent',
+                };
 
             case GameState.BattleOne:
-                return 'Defend the fortress';
+                return {
+                    text: 'Defend the fortress',
+                    type: 'temporary',
+                };
 
             case GameState.BattleTwo:
-                return 'Heavy enemy incoming';
+                return {
+                    text: 'Heavy enemy incoming',
+                    type: 'temporary',
+                };
 
             case GameState.SkillTutorial:
-                return 'Use fireball';
+                return {
+                    text: 'Use fireball',
+                    type: 'persistent',
+                };
 
             case GameState.FireballCast:
-                return '';
+                return {
+                    text: '',
+                    type: 'hidden',
+                };
 
             case GameState.Victory:
-                return '';
+                return {
+                    text: '',
+                    type: 'hidden',
+                };
 
             default:
-                return '';
+                return {
+                    text: '',
+                    type: 'hidden',
+                };
         }
     }
 }
