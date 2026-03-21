@@ -187,6 +187,10 @@ export class GameController extends Component {
 
         this.skillButtonController?.setInteractionEnabled(false);
         this.skillButtonController?.setHighlightVisible(false);
+
+        this.towerController?.stopBattle();
+        this.fortressAttackController?.stopBattle();
+
         this.refreshView();
 
         if (!this.fireballController || !this.heavyEnemyNode || !this.fireballSkyCastPointNode) {
