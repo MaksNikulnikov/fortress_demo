@@ -9,7 +9,10 @@ export class ArrowProjectileController extends Component {
     public bodyOpacity: UIOpacity | null = null;
 
     @property
-    public flightDuration = GameplayConfig.arrowFlightDuration;
+    public flightDuration: number = GameplayConfig.arrowFlightDuration;
+
+    @property
+    public useGameplayConfigFlightDuration = true;
 
     @property
     public rotationOffset = 0;
@@ -25,6 +28,7 @@ export class ArrowProjectileController extends Component {
             this.bodyOpacity = this.getComponent(UIOpacity);
         }
 
+        this.syncFlightDurationFromConfig();
         this.node.active = false;
     }
 
@@ -78,6 +82,12 @@ export class ArrowProjectileController extends Component {
 
     public isBusy(): boolean {
         return this.isFlightActive;
+    }
+
+    private syncFlightDurationFromConfig(): void {
+        if (this.useGameplayConfigFlightDuration) {
+            this.flightDuration = GameplayConfig.arrowFlightDuration;
+        }
     }
 
     private updateRotation(): void {

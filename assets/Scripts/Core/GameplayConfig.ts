@@ -4,14 +4,14 @@ export const GameplayConfig = {
 
     lightEnemyMaxHealth: 2,
     lightEnemyCountInWave: 3,
-    lightEnemySpawnInterval: 0.45,
+    lightEnemySpawnInterval: 1.5,
 
-    heavyEnemyMaxHealth: 8,
+    heavyEnemyMaxHealth: 12,
     enemyMoveSpeed: 120,
-    enemyAttackInterval: 0.8,
+    enemyAttackInterval: 1.6,
 
     towerAttackRange: 320,
-    towerAttackInterval: 0.4,
+    towerAttackInterval: 0.6,
     towerDamage: 1,
 
     fortressAttackRange: 420,

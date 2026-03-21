@@ -1,9 +1,16 @@
-import { _decorator, Component, Node, tween, Tween, Vec3 } from 'cc';
+import { _decorator, Component, Enum, Node, tween, Tween, Vec3 } from 'cc';
 import { GameplayConfig } from '../Core/GameplayConfig';
 import { ArrowProjectileController } from './ArrowProjectileController';
 import { EnemyController } from './EnemyController';
 
 const { ccclass, property } = _decorator;
+
+enum CombatStatsProfile {
+    Auto = 0,
+    Tower = 1,
+    Fortress = 2,
+    Custom = 3,
+}
 
 @ccclass('TowerController')
 export class TowerController extends Component {
@@ -13,14 +20,17 @@ export class TowerController extends Component {
     @property(Node)
     public projectileNode: Node | null = null;
 
-    @property
-    public attackRange = GameplayConfig.towerAttackRange;
+    @property({ type: Enum(CombatStatsProfile) })
+    public statsProfile = CombatStatsProfile.Auto;
 
     @property
-    public attackInterval = GameplayConfig.towerAttackInterval;
+    public attackRange: number = GameplayConfig.towerAttackRange;
 
     @property
-    public attackDamage = GameplayConfig.towerDamage;
+    public attackInterval: number = GameplayConfig.towerAttackInterval;
+
+    @property
+    public attackDamage: number = GameplayConfig.towerDamage;
 
     @property
     public attackPunchScaleMultiplier = 1.08;
@@ -39,6 +49,7 @@ export class TowerController extends Component {
 
     protected onLoad(): void {
         this.baseScale.set(this.node.scale);
+        this.syncCombatStatsFromConfig();
         this.projectileController = this.projectileNode?.getComponent(ArrowProjectileController) ?? null;
     }
 
@@ -170,6 +181,41 @@ export class TowerController extends Component {
     private setCurrentTarget(enemyNode: Node | null): void {
         this.enemyNode = enemyNode;
         this.enemyController = enemyNode?.getComponent(EnemyController) ?? null;
+    }
+
+    private syncCombatStatsFromConfig(): void {
+        const resolvedProfile = this.resolveStatsProfile();
+
+        if (resolvedProfile === CombatStatsProfile.Tower) {
+            this.attackRange = GameplayConfig.towerAttackRange;
+            this.attackInterval = GameplayConfig.towerAttackInterval;
+            this.attackDamage = GameplayConfig.towerDamage;
+            return;
+        }
+
+        if (resolvedProfile === CombatStatsProfile.Fortress) {
+            this.attackRange = GameplayConfig.fortressAttackRange;
+            this.attackInterval = GameplayConfig.fortressAttackInterval;
+            this.attackDamage = GameplayConfig.fortressDamage;
+        }
+    }
+
+    private resolveStatsProfile(): CombatStatsProfile {
+        if (this.statsProfile !== CombatStatsProfile.Auto) {
+            return this.statsProfile;
+        }
+
+        const nodeName = this.node.name.toLowerCase();
+
+        if (nodeName.includes('fortress')) {
+            return CombatStatsProfile.Fortress;
+        }
+
+        if (nodeName.includes('tower')) {
+            return CombatStatsProfile.Tower;
+        }
+
+        return CombatStatsProfile.Custom;
     }
 
     private playAttackFeedback(): void {

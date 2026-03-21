@@ -37,7 +37,10 @@ export class EnemyController extends Component {
     public canAttackAtGoal = false;
 
     @property
-    public attackInterval = GameplayConfig.enemyAttackInterval;
+    public attackInterval: number = GameplayConfig.enemyAttackInterval;
+
+    @property
+    public useGameplayConfigAttackInterval = true;
 
     @property
     public deathFadeDelay = 1;
@@ -66,6 +69,8 @@ export class EnemyController extends Component {
         if (!this.bodyOpacity) {
             this.bodyOpacity = this.getComponent(UIOpacity);
         }
+
+        this.syncCombatSettingsFromConfig();
     }
 
     protected onDestroy(): void {
@@ -100,6 +105,7 @@ export class EnemyController extends Component {
     public startBattle(startNode: Node, endNode: Node, maxHealth: number): void {
         this.stopRunningTweens();
         this.animationComponent?.off(Animation.EventType.FINISHED, this.onDeathAnimationFinished, this);
+        this.syncCombatSettingsFromConfig();
 
         this.currentHealth = maxHealth;
         this.moveTarget = endNode;
@@ -240,6 +246,12 @@ export class EnemyController extends Component {
         }
 
         this.animationComponent.play(animationName);
+    }
+
+    private syncCombatSettingsFromConfig(): void {
+        if (this.useGameplayConfigAttackInterval) {
+            this.attackInterval = GameplayConfig.enemyAttackInterval;
+        }
     }
 
     private playHitFeedback(): void {
