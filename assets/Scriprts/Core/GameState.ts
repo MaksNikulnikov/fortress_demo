@@ -4,5 +4,6 @@ export enum GameState {
     BattleOne = 'BattleOne',
     BattleTwo = 'BattleTwo',
     SkillTutorial = 'SkillTutorial',
+    FireballCast = 'FireballCast',
     Victory = 'Victory',
 }

@@ -11,4 +11,10 @@ export const GameplayConfig = {
     towerDamage: 1,
 
     skillDamage: 999,
+
+    fireballFlightDuration: 0.45,
+    fireballImpactDuration: 0.35,
+    fireballStartScale: 0.7,
+    fireballEndScale: 1.15,
+    fireballRotationSpeed: 720,
 } as const;

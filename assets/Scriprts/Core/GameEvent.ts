@@ -5,6 +5,7 @@ export enum GameEvent {
     EnemyDefeated = 'EnemyDefeated',
     EnemyReachedGoal = 'EnemyReachedGoal',
     SkillButtonTapped = 'SkillButtonTapped',
+    FireballImpactFinished = 'FireballImpactFinished',
     TutorialUpdated = 'TutorialUpdated',
     StateChanged = 'StateChanged',
 }

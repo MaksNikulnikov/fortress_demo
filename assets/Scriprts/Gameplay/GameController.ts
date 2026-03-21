@@ -5,6 +5,7 @@ import { GameplayConfig } from '../Core/GameplayConfig';
 import { GameState } from '../Core/GameState';
 import { BuildSpotController } from './BuildSpotController';
 import { EnemyController } from './EnemyController';
+import { FireballController } from './FireballController';
 import { MineController } from './MineController';
 import { SkillButtonController } from './SkillButtonController';
 import { TowerController } from './TowerController';
@@ -47,6 +48,12 @@ export class GameController extends Component {
     @property(Node)
     public victoryOverlayNode: Node | null = null;
 
+    @property(Node)
+    public fireballNode: Node | null = null;
+
+    @property(Node)
+    public fireballSkyCastPointNode: Node | null = null;
+
     @property
     public victoryDelay = 0.2;
 
@@ -63,6 +70,7 @@ export class GameController extends Component {
     private heavyEnemyController: EnemyController | null = null;
     private skillButtonController: SkillButtonController | null = null;
     private victoryOverlayController: VictoryOverlayController | null = null;
+    private fireballController: FireballController | null = null;
     private canvasBaseScale = new Vec3(1, 1, 1);
 
     protected onLoad(): void {
@@ -73,6 +81,7 @@ export class GameController extends Component {
         this.heavyEnemyController = this.heavyEnemyNode?.getComponent(EnemyController) ?? null;
         this.skillButtonController = this.skillButtonNode?.getComponent(SkillButtonController) ?? null;
         this.victoryOverlayController = this.victoryOverlayNode?.getComponent(VictoryOverlayController) ?? null;
+        this.fireballController = this.fireballNode?.getComponent(FireballController) ?? null;
 
         this.canvasBaseScale.set(this.node.scale);
 
@@ -81,6 +90,7 @@ export class GameController extends Component {
         GameEventBus.on(GameEvent.EnemyDefeated, this.onEnemyDefeated);
         GameEventBus.on(GameEvent.EnemyReachedGoal, this.onEnemyReachedGoal);
         GameEventBus.on(GameEvent.SkillButtonTapped, this.onSkillButtonTapped);
+        GameEventBus.on(GameEvent.FireballImpactFinished, this.onFireballImpactFinished);
     }
 
     protected start(): void {
@@ -94,6 +104,7 @@ export class GameController extends Component {
         GameEventBus.off(GameEvent.EnemyDefeated, this.onEnemyDefeated);
         GameEventBus.off(GameEvent.EnemyReachedGoal, this.onEnemyReachedGoal);
         GameEventBus.off(GameEvent.SkillButtonTapped, this.onSkillButtonTapped);
+        GameEventBus.off(GameEvent.FireballImpactFinished, this.onFireballImpactFinished);
     }
 
     private onMineTapped = (): void => {
@@ -135,7 +146,7 @@ export class GameController extends Component {
             return;
         }
 
-        if (this.currentState === GameState.SkillTutorial) {
+        if (this.currentState === GameState.FireballCast) {
             this.currentState = GameState.Victory;
             this.emitStateChanged();
             this.towerController?.stopBattle();
@@ -168,10 +179,27 @@ export class GameController extends Component {
             return;
         }
 
+        this.currentState = GameState.FireballCast;
+        this.emitStateChanged();
+
         this.skillButtonController?.setInteractionEnabled(false);
         this.skillButtonController?.setHighlightVisible(false);
+        this.refreshView();
+
+        if (!this.fireballController || !this.heavyEnemyNode || !this.fireballSkyCastPointNode) {
+            this.heavyEnemyController?.receiveDamage(GameplayConfig.skillDamage);
+            return;
+        }
 
         this.playSkillImpactFeedback();
+        this.fireballController.castFromSky(this.heavyEnemyNode, this.fireballSkyCastPointNode);
+    };
+
+    private onFireballImpactFinished = (): void => {
+        if (this.currentState !== GameState.FireballCast) {
+            return;
+        }
+
         this.heavyEnemyController?.receiveDamage(GameplayConfig.skillDamage);
     };
 
@@ -273,6 +301,7 @@ export class GameController extends Component {
             this.currentState === GameState.BattleOne ||
             this.currentState === GameState.BattleTwo ||
             this.currentState === GameState.SkillTutorial ||
+            this.currentState === GameState.FireballCast ||
             this.currentState === GameState.Victory;
 
         if (this.buildSpotNode) {
@@ -292,6 +321,7 @@ export class GameController extends Component {
             this.currentState === GameState.BattleOne ||
             this.currentState === GameState.BattleTwo ||
             this.currentState === GameState.SkillTutorial ||
+            this.currentState === GameState.FireballCast ||
             this.currentState === GameState.Victory;
     }
 
@@ -333,6 +363,9 @@ export class GameController extends Component {
 
             case GameState.SkillTutorial:
                 return 'Use fireball';
+
+            case GameState.FireballCast:
+                return '';
 
             case GameState.Victory:
                 return '';
