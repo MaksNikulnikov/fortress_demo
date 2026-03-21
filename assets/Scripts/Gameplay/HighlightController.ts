@@ -1,4 +1,4 @@
-import { _decorator, Color, Component, Sprite, tween, Tween, UIOpacity, Vec3 } from 'cc';
+import { _decorator, Color, Component, Node, Sprite, tween, Tween, UIOpacity, Vec3 } from 'cc';
 
 const { ccclass, property } = _decorator;
 
@@ -44,8 +44,8 @@ export class HighlightController extends Component {
     private baseScale = new Vec3(1, 1, 1);
     private isVisible = false;
     private isPulseEnabled = false;
-    private scaleTween: Tween<any> | null = null;
-    private opacityTween: Tween<any> | null = null;
+    private scaleTween: Tween<Node> | null = null;
+    private opacityTween: Tween<UIOpacity> | null = null;
 
     protected onLoad(): void {
         this.baseScale.set(this.node.scale);

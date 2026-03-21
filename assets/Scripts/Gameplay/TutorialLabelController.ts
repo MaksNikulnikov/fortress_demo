@@ -1,4 +1,4 @@
-import { _decorator, Component, Label, tween, Tween, UIOpacity, Vec3 } from 'cc';
+import { _decorator, Component, Label, Node, tween, Tween, UIOpacity, Vec3 } from 'cc';
 
 const { ccclass, property } = _decorator;
 
@@ -23,9 +23,10 @@ export class TutorialLabelController extends Component {
     public autoHideDelay = 1.4;
 
     private baseScale = new Vec3(1, 1, 1);
-    private showTween: Tween<any> | null = null;
-    private hideTween: Tween<any> | null = null;
-    private autoHideTween: Tween<any> | null = null;
+    private showTween: Tween<Node> | null = null;
+    private hideTween: Tween<Node> | null = null;
+    private opacityTween: Tween<UIOpacity> | null = null;
+    private autoHideTween: Tween<Node> | null = null;
     private currentText = '';
 
     protected onLoad(): void {
@@ -73,6 +74,7 @@ export class TutorialLabelController extends Component {
 
         this.currentText = text;
         this.label.string = text;
+        this.stopAutoHide();
         this.playShowAnimation();
 
         this.autoHideTween = tween(this.node)
@@ -100,19 +102,23 @@ export class TutorialLabelController extends Component {
             ) })
             .call(() => {
                 if (this.opacityComponent) {
-                    tween(this.opacityComponent)
-                        .to(this.hideDuration, { opacity: 0 })
-                        .call(() => {
-                            this.node.active = false;
-                            this.node.setScale(this.baseScale);
-                        })
-                        .start();
-                } else {
-                    this.node.active = false;
-                    this.node.setScale(this.baseScale);
+                    return;
                 }
+
+                this.node.active = false;
+                this.node.setScale(this.baseScale);
             })
             .start();
+
+        if (this.opacityComponent) {
+            this.opacityTween = tween(this.opacityComponent)
+                .to(this.hideDuration, { opacity: 0 })
+                .call(() => {
+                    this.node.active = false;
+                    this.node.setScale(this.baseScale);
+                })
+                .start();
+        }
     }
 
     private playShowAnimation(): void {
@@ -134,7 +140,7 @@ export class TutorialLabelController extends Component {
             .start();
 
         if (this.opacityComponent) {
-            tween(this.opacityComponent)
+            this.opacityTween = tween(this.opacityComponent)
                 .to(this.showDuration, { opacity: 255 })
                 .start();
         }
@@ -149,6 +155,11 @@ export class TutorialLabelController extends Component {
         if (this.hideTween) {
             this.hideTween.stop();
             this.hideTween = null;
+        }
+
+        if (this.opacityTween) {
+            this.opacityTween.stop();
+            this.opacityTween = null;
         }
     }
 

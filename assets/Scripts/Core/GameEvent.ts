@@ -1,5 +1,4 @@
 export enum GameEvent {
-    GoldChanged = 'GoldChanged',
     MineTapped = 'MineTapped',
     BuildSpotTapped = 'BuildSpotTapped',
     EnemyDefeated = 'EnemyDefeated',
@@ -7,6 +6,4 @@ export enum GameEvent {
     EnemyAttackPerformed = 'EnemyAttackPerformed',
     SkillButtonTapped = 'SkillButtonTapped',
     FireballImpactFinished = 'FireballImpactFinished',
-    TutorialUpdated = 'TutorialUpdated',
-    StateChanged = 'StateChanged',
 }

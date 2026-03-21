@@ -1,4 +1,4 @@
-import { _decorator, Component, Node, Sprite, tween, Tween, UIOpacity, Vec3 } from 'cc';
+import { _decorator, Component, Node, tween, Tween, UIOpacity, Vec3 } from 'cc';
 import { GameEvent } from '../Core/GameEvent';
 import { GameEventBus } from '../Core/GameEventBus';
 import { GameplayConfig } from '../Core/GameplayConfig';
@@ -16,9 +16,6 @@ export class FireballController extends Component {
     @property(UIOpacity)
     public impactOpacity: UIOpacity | null = null;
 
-    @property(Sprite)
-    public impactSprite: Sprite | null = null;
-
     private flightTween: Tween<Node> | null = null;
     private impactScaleTween: Tween<Node> | null = null;
     private impactOpacityTween: Tween<UIOpacity> | null = null;
@@ -34,14 +31,14 @@ export class FireballController extends Component {
 
         if (this.impactNode) {
             this.baseImpactScale.set(this.impactNode.scale);
-            this.impactNode.active = false;
         }
 
-        if (this.impactOpacity) {
-            this.impactOpacity.opacity = 0;
-        }
+        this.resetEffectState();
+    }
 
-        this.node.active = false;
+    protected onDestroy(): void {
+        this.stopTweens();
+        this.resetEffectState();
     }
 
     protected update(deltaTime: number): void {
@@ -77,6 +74,10 @@ export class FireballController extends Component {
             this.impactNode.active = false;
         }
 
+        if (this.impactOpacity) {
+            this.impactOpacity.opacity = 0;
+        }
+
         const targetWorldPosition = targetNode.worldPosition.clone();
 
         this.flightTween = tween(this.node)
@@ -103,7 +104,7 @@ export class FireballController extends Component {
         this.node.active = false;
 
         if (!this.targetNode || !this.impactNode) {
-            GameEventBus.emit(GameEvent.FireballImpactFinished);
+            this.finishImpact();
             return;
         }
 
@@ -137,15 +138,42 @@ export class FireballController extends Component {
             this.impactOpacityTween = tween(this.impactOpacity)
                 .to(GameplayConfig.fireballImpactDuration, { opacity: 0 })
                 .call(() => {
-                    if (this.impactNode) {
-                        this.impactNode.active = false;
-                    }
-
-                    GameEventBus.emit(GameEvent.FireballImpactFinished);
+                    this.finishImpact();
                 })
                 .start();
         } else {
-            GameEventBus.emit(GameEvent.FireballImpactFinished);
+            this.finishImpact();
+        }
+    }
+
+    private finishImpact(): void {
+        if (this.impactNode) {
+            this.impactNode.active = false;
+            this.impactNode.setScale(this.baseImpactScale);
+        }
+
+        this.targetNode = null;
+        GameEventBus.emit(GameEvent.FireballImpactFinished);
+    }
+
+    private resetEffectState(): void {
+        this.currentRotation = 0;
+        this.isFlying = false;
+        this.targetNode = null;
+        this.node.active = false;
+        this.node.setRotationFromEuler(0, 0, 0);
+
+        if (this.fireballOpacity) {
+            this.fireballOpacity.opacity = 255;
+        }
+
+        if (this.impactOpacity) {
+            this.impactOpacity.opacity = 0;
+        }
+
+        if (this.impactNode) {
+            this.impactNode.active = false;
+            this.impactNode.setScale(this.baseImpactScale);
         }
     }
 

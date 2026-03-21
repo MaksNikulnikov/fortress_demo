@@ -1,4 +1,4 @@
-import { _decorator, Color, Component, Label, tween, Tween, Vec3 } from 'cc';
+import { _decorator, Color, Component, Label, Node, tween, Tween, Vec3 } from 'cc';
 
 const { ccclass, property } = _decorator;
 
@@ -14,7 +14,7 @@ export class GoldCounterController extends Component {
     public punchDuration = 0.08;
 
     private baseScale = new Vec3(1, 1, 1);
-    private punchTween: Tween<any> | null = null;
+    private punchTween: Tween<Node> | null = null;
     private colorTween: Tween<Label> | null = null;
     private previousValue = -1;
 

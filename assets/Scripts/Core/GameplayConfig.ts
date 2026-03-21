@@ -10,8 +10,8 @@ export const GameplayConfig = {
     enemyMoveSpeed: 120,
     enemyAttackInterval: 0.8,
 
-    towerAttackRange: 260,
-    towerAttackInterval: 0.6,
+    towerAttackRange: 320,
+    towerAttackInterval: 0.4,
     towerDamage: 1,
 
     fortressAttackRange: 420,

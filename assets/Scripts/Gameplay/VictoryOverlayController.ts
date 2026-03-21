@@ -31,6 +31,7 @@ export class VictoryOverlayController extends Component {
     private dimmerTween: Tween<UIOpacity> | null = null;
     private panelScaleTween: Tween<Node> | null = null;
     private panelOpacityTween: Tween<UIOpacity> | null = null;
+    private ctaRevealTween: Tween<Node> | null = null;
 
     protected onLoad(): void {
         if (this.panelNode) {
@@ -41,10 +42,15 @@ export class VictoryOverlayController extends Component {
         this.hideImmediately();
     }
 
+    protected onDestroy(): void {
+        this.stopTweens();
+    }
+
     public show(): void {
         this.stopTweens();
 
         this.node.active = true;
+        this.ctaButtonController?.setInteractionEnabled(true);
 
         if (this.dimmerOpacity) {
             this.dimmerOpacity.opacity = 0;
@@ -88,17 +94,6 @@ export class VictoryOverlayController extends Component {
         }
     }
 
-    public playFlash(): void {
-        if (!this.dimmerOpacity) {
-            return;
-        }
-
-        tween(this.dimmerOpacity)
-            .to(0.08, { opacity: Math.min(this.dimmerTargetOpacity + 40, 255) })
-            .to(0.12, { opacity: this.dimmerTargetOpacity })
-            .start();
-    }
-
     private showCtaButton(): void {
         if (!this.ctaButtonNode) {
             return;
@@ -106,7 +101,7 @@ export class VictoryOverlayController extends Component {
 
         this.ctaButtonNode.active = true;
 
-        tween(this.ctaButtonNode)
+        this.ctaRevealTween = tween(this.ctaButtonNode)
             .delay(this.ctaDelay)
             .call(() => {
                 this.ctaButtonController?.playShowAnimation();
@@ -148,6 +143,11 @@ export class VictoryOverlayController extends Component {
         if (this.panelOpacityTween) {
             this.panelOpacityTween.stop();
             this.panelOpacityTween = null;
+        }
+
+        if (this.ctaRevealTween) {
+            this.ctaRevealTween.stop();
+            this.ctaRevealTween = null;
         }
     }
 }

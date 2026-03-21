@@ -1,4 +1,4 @@
-import { _decorator, Component, Label, Node, tween } from 'cc';
+import { _decorator, Component, Label, Node, tween, Tween } from 'cc';
 import { GameEvent } from '../Core/GameEvent';
 import { GameEventBus } from '../Core/GameEventBus';
 import { GameplayConfig } from '../Core/GameplayConfig';
@@ -15,6 +15,81 @@ import { TutorialLabelController } from './TutorialLabelController';
 import { VictoryOverlayController } from './VictoryOverlayController';
 
 const { ccclass, property } = _decorator;
+
+type TutorialTextType = 'persistent' | 'temporary' | 'hidden';
+
+interface TutorialMessage {
+    text: string;
+    type: TutorialTextType;
+}
+
+const BUILD_SPOT_HIDDEN_STATES = new Set<GameState>([
+    GameState.BattleOne,
+    GameState.BattleTwo,
+    GameState.SkillTutorial,
+    GameState.FireballCast,
+    GameState.Victory,
+]);
+
+const TOWER_VISIBLE_STATES = new Set<GameState>([
+    GameState.BattleOne,
+    GameState.BattleTwo,
+    GameState.SkillTutorial,
+    GameState.FireballCast,
+    GameState.Victory,
+]);
+
+const ENEMY_HIDDEN_STATES = new Set<GameState>([
+    GameState.TapMineTutorial,
+    GameState.BuildTowerTutorial,
+    GameState.Victory,
+]);
+
+function getTutorialMessage(
+    state: GameState,
+    goldAmount: number,
+    hasShownBattleOneTutorial: boolean
+): TutorialMessage {
+    switch (state) {
+        case GameState.TapMineTutorial:
+            return {
+                text: `Tap the mine ${goldAmount}/${GameplayConfig.goldTargetForTowerBuild}`,
+                type: 'persistent',
+            };
+
+        case GameState.BuildTowerTutorial:
+            return {
+                text: 'Build the tower',
+                type: 'persistent',
+            };
+
+        case GameState.BattleOne:
+            return {
+                text: hasShownBattleOneTutorial ? '' : 'Defend the fortress',
+                type: hasShownBattleOneTutorial ? 'hidden' : 'temporary',
+            };
+
+        case GameState.BattleTwo:
+            return {
+                text: 'Heavy enemy incoming',
+                type: 'temporary',
+            };
+
+        case GameState.SkillTutorial:
+            return {
+                text: 'Use fireball',
+                type: 'persistent',
+            };
+
+        case GameState.FireballCast:
+        case GameState.Victory:
+        default:
+            return {
+                text: '',
+                type: 'hidden',
+            };
+    }
+}
 
 @ccclass('GameController')
 export class GameController extends Component {
@@ -65,6 +140,7 @@ export class GameController extends Component {
     private defeatedLightEnemiesCount = 0;
     private spawnedLightEnemiesCount = 0;
     private hasShownBattleOneTutorial = false;
+    private lightWaveTweens: Array<Tween<Node>> = [];
 
     private mineController: MineController | null = null;
     private buildSpotController: BuildSpotController | null = null;
@@ -108,7 +184,6 @@ export class GameController extends Component {
 
     protected start(): void {
         this.refreshView();
-        this.emitStateChanged();
     }
 
     protected onDestroy(): void {
@@ -119,6 +194,8 @@ export class GameController extends Component {
         GameEventBus.off(GameEvent.EnemyAttackPerformed, this.onEnemyAttackPerformed);
         GameEventBus.off(GameEvent.SkillButtonTapped, this.onSkillButtonTapped);
         GameEventBus.off(GameEvent.FireballImpactFinished, this.onFireballImpactFinished);
+
+        this.stopLightWaveTweens();
     }
 
     private onMineTapped = (): void => {
@@ -128,13 +205,9 @@ export class GameController extends Component {
 
         this.goldAmount += GameplayConfig.goldPerMineTap;
 
-        GameEventBus.emit(GameEvent.GoldChanged, {
-            goldAmount: this.goldAmount,
-        });
-
         if (this.goldAmount >= GameplayConfig.goldTargetForTowerBuild) {
-            this.currentState = GameState.BuildTowerTutorial;
-            this.emitStateChanged();
+            this.enterBuildTowerTutorial();
+            return;
         }
 
         this.refreshView();
@@ -145,14 +218,7 @@ export class GameController extends Component {
             return;
         }
 
-        this.currentState = GameState.BattleOne;
-        this.defeatedLightEnemiesCount = 0;
-        this.spawnedLightEnemiesCount = 0;
-        this.hasShownBattleOneTutorial = false;
-
-        this.emitStateChanged();
-        this.startLightWave();
-        this.refreshView();
+        this.enterBattleOne();
     };
 
     private onEnemyDefeated = (): void => {
@@ -160,10 +226,7 @@ export class GameController extends Component {
             this.defeatedLightEnemiesCount += 1;
 
             if (this.defeatedLightEnemiesCount >= GameplayConfig.lightEnemyCountInWave) {
-                this.currentState = GameState.BattleTwo;
-                this.emitStateChanged();
-                this.startSecondBattle();
-                this.refreshView();
+                this.enterBattleTwo();
                 return;
             }
 
@@ -172,12 +235,7 @@ export class GameController extends Component {
         }
 
         if (this.currentState === GameState.FireballCast) {
-            this.currentState = GameState.Victory;
-            this.emitStateChanged();
-            this.towerController?.stopBattle();
-            this.fortressAttackController?.stopBattle();
-            this.refreshView();
-            this.victoryOverlayController?.show();
+            this.enterVictory();
         }
     };
 
@@ -186,17 +244,7 @@ export class GameController extends Component {
             return;
         }
 
-        this.currentState = GameState.SkillTutorial;
-        this.emitStateChanged();
-
-        this.towerController?.stopBattle();
-
-        if (this.heavyEnemyNode) {
-            this.fortressAttackController?.startBattle(this.heavyEnemyNode);
-        }
-
-        this.refreshView();
-        this.skillButtonController?.playShowAnimation();
+        this.enterSkillTutorial();
     };
 
     private onEnemyAttackPerformed = (): void => {
@@ -212,9 +260,58 @@ export class GameController extends Component {
             return;
         }
 
-        this.currentState = GameState.FireballCast;
-        this.emitStateChanged();
+        this.enterFireballCast();
+    };
 
+    private onFireballImpactFinished = (): void => {
+        if (this.currentState !== GameState.FireballCast) {
+            return;
+        }
+
+        this.heavyEnemyController?.receiveDamage(GameplayConfig.skillDamage);
+    };
+
+    private enterBuildTowerTutorial(): void {
+        this.currentState = GameState.BuildTowerTutorial;
+        this.refreshView();
+    }
+
+    private enterBattleOne(): void {
+        this.currentState = GameState.BattleOne;
+        this.defeatedLightEnemiesCount = 0;
+        this.spawnedLightEnemiesCount = 0;
+        this.hasShownBattleOneTutorial = false;
+
+        this.startLightWave();
+        this.refreshView();
+    }
+
+    private enterBattleTwo(): void {
+        this.currentState = GameState.BattleTwo;
+
+        this.stopLightWaveTweens();
+        this.startSecondBattle();
+        this.refreshView();
+    }
+
+    private enterSkillTutorial(): void {
+        this.currentState = GameState.SkillTutorial;
+
+        this.stopLightWaveTweens();
+        this.towerController?.stopBattle();
+
+        if (this.heavyEnemyNode) {
+            this.fortressAttackController?.startBattle(this.heavyEnemyNode);
+        }
+
+        this.refreshView();
+        this.skillButtonController?.playShowAnimation();
+    }
+
+    private enterFireballCast(): void {
+        this.currentState = GameState.FireballCast;
+
+        this.stopLightWaveTweens();
         this.skillButtonController?.setInteractionEnabled(false);
         this.skillButtonController?.setHighlightVisible(false);
 
@@ -229,22 +326,26 @@ export class GameController extends Component {
         }
 
         this.fireballController.castFromSky(this.heavyEnemyNode, this.fireballSkyCastPointNode);
-    };
+    }
 
-    private onFireballImpactFinished = (): void => {
-        if (this.currentState !== GameState.FireballCast) {
-            return;
-        }
+    private enterVictory(): void {
+        this.currentState = GameState.Victory;
 
-        this.heavyEnemyController?.receiveDamage(GameplayConfig.skillDamage);
-    };
+        this.stopLightWaveTweens();
+        this.towerController?.stopBattle();
+        this.fortressAttackController?.stopBattle();
+
+        this.refreshView();
+        this.victoryOverlayController?.show();
+    }
 
     private startLightWave(): void {
         this.hideAllEnemies();
         this.fortressAttackController?.stopBattle();
+        this.stopLightWaveTweens();
 
         for (let index = 0; index < GameplayConfig.lightEnemyCountInWave; index += 1) {
-            tween(this.node)
+            const spawnTween = tween(this.node)
                 .delay(index * GameplayConfig.lightEnemySpawnInterval)
                 .call(() => {
                     if (this.currentState !== GameState.BattleOne) {
@@ -252,9 +353,19 @@ export class GameController extends Component {
                     }
 
                     this.spawnNextLightEnemy();
-                })
-                .start();
+                });
+
+            this.lightWaveTweens.push(spawnTween);
+            spawnTween.start();
         }
+    }
+
+    private stopLightWaveTweens(): void {
+        for (const lightWaveTween of this.lightWaveTweens) {
+            lightWaveTween.stop();
+        }
+
+        this.lightWaveTweens.length = 0;
     }
 
     private spawnNextLightEnemy(): void {
@@ -324,12 +435,6 @@ export class GameController extends Component {
         }
     }
 
-    private emitStateChanged(): void {
-        GameEventBus.emit(GameEvent.StateChanged, {
-            state: this.currentState,
-        });
-    }
-
     private refreshView(): void {
         this.updateGoldLabel();
         this.updateTutorialLabel();
@@ -362,13 +467,17 @@ export class GameController extends Component {
     }
 
     private updateTutorialLabel(): void {
-        const tutorialText = this.getTutorialText();
+        const tutorialMessage = getTutorialMessage(
+            this.currentState,
+            this.goldAmount,
+            this.hasShownBattleOneTutorial
+        );
 
         if (this.tutorialLabelController) {
-            if (tutorialText.type === 'persistent') {
-                this.tutorialLabelController.showPersistentText(tutorialText.text);
-            } else if (tutorialText.type === 'temporary') {
-                this.tutorialLabelController.showTemporaryText(tutorialText.text);
+            if (tutorialMessage.type === 'persistent') {
+                this.tutorialLabelController.showPersistentText(tutorialMessage.text);
+            } else if (tutorialMessage.type === 'temporary') {
+                this.tutorialLabelController.showTemporaryText(tutorialMessage.text);
 
                 if (this.currentState === GameState.BattleOne) {
                     this.hasShownBattleOneTutorial = true;
@@ -384,9 +493,9 @@ export class GameController extends Component {
             return;
         }
 
-        this.tutorialLabel.string = tutorialText.text;
+        this.tutorialLabel.string = tutorialMessage.text;
 
-        if (tutorialText.type === 'temporary' && this.currentState === GameState.BattleOne) {
+        if (tutorialMessage.type === 'temporary' && this.currentState === GameState.BattleOne) {
             this.hasShownBattleOneTutorial = true;
         }
     }
@@ -398,15 +507,9 @@ export class GameController extends Component {
 
     private updateBuildSpotView(): void {
         const isBuildStep = this.currentState === GameState.BuildTowerTutorial;
-        const shouldHideBuildSpot =
-            this.currentState === GameState.BattleOne ||
-            this.currentState === GameState.BattleTwo ||
-            this.currentState === GameState.SkillTutorial ||
-            this.currentState === GameState.FireballCast ||
-            this.currentState === GameState.Victory;
 
         if (this.buildSpotNode) {
-            this.buildSpotNode.active = !shouldHideBuildSpot;
+            this.buildSpotNode.active = !BUILD_SPOT_HIDDEN_STATES.has(this.currentState);
         }
 
         this.buildSpotController?.setInteractionEnabled(isBuildStep);
@@ -418,20 +521,11 @@ export class GameController extends Component {
             return;
         }
 
-        this.towerNode.active =
-            this.currentState === GameState.BattleOne ||
-            this.currentState === GameState.BattleTwo ||
-            this.currentState === GameState.SkillTutorial ||
-            this.currentState === GameState.FireballCast ||
-            this.currentState === GameState.Victory;
+        this.towerNode.active = TOWER_VISIBLE_STATES.has(this.currentState);
     }
 
     private updateEnemyView(): void {
-        if (
-            this.currentState === GameState.TapMineTutorial ||
-            this.currentState === GameState.BuildTowerTutorial ||
-            this.currentState === GameState.Victory
-        ) {
+        if (ENEMY_HIDDEN_STATES.has(this.currentState)) {
             this.hideAllEnemies();
         }
     }
@@ -446,57 +540,5 @@ export class GameController extends Component {
         this.skillButtonNode.active = isSkillStep;
         this.skillButtonController?.setInteractionEnabled(isSkillStep);
         this.skillButtonController?.setHighlightVisible(isSkillStep);
-    }
-
-    private getTutorialText(): { text: string; type: 'persistent' | 'temporary' | 'hidden' } {
-        switch (this.currentState) {
-            case GameState.TapMineTutorial:
-                return {
-                    text: `Tap the mine ${this.goldAmount}/${GameplayConfig.goldTargetForTowerBuild}`,
-                    type: 'persistent',
-                };
-
-            case GameState.BuildTowerTutorial:
-                return {
-                    text: 'Build the tower',
-                    type: 'persistent',
-                };
-
-            case GameState.BattleOne:
-                return {
-                    text: this.hasShownBattleOneTutorial ? '' : 'Defend the fortress',
-                    type: this.hasShownBattleOneTutorial ? 'hidden' : 'temporary',
-                };
-
-            case GameState.BattleTwo:
-                return {
-                    text: 'Heavy enemy incoming',
-                    type: 'temporary',
-                };
-
-            case GameState.SkillTutorial:
-                return {
-                    text: 'Use fireball',
-                    type: 'persistent',
-                };
-
-            case GameState.FireballCast:
-                return {
-                    text: '',
-                    type: 'hidden',
-                };
-
-            case GameState.Victory:
-                return {
-                    text: '',
-                    type: 'hidden',
-                };
-
-            default:
-                return {
-                    text: '',
-                    type: 'hidden',
-                };
-        }
     }
 }
