@@ -1,44 +1,55 @@
 import { GameEvent } from './GameEvent';
 
 type EventHandler = () => void;
+type EventHandlersMap = Partial<Record<GameEvent, EventHandler[]>>;
 
 export class GameEventBus {
-    private static handlersMap: Map<GameEvent, Set<EventHandler>> = new Map();
+    private static handlersMap: EventHandlersMap = {};
 
     public static on(eventName: GameEvent, handler: EventHandler): void {
-        let handlers = this.handlersMap.get(eventName);
+        let handlers = this.handlersMap[eventName];
 
         if (!handlers) {
-            handlers = new Set<EventHandler>();
-            this.handlersMap.set(eventName, handlers);
+            handlers = [];
+            this.handlersMap[eventName] = handlers;
         }
 
-        handlers.add(handler);
+        if (!handlers.includes(handler)) {
+            handlers.push(handler);
+        }
     }
 
     public static off(eventName: GameEvent, handler: EventHandler): void {
-        const handlers = this.handlersMap.get(eventName);
+        const handlers = this.handlersMap[eventName];
 
         if (!handlers) {
             return;
         }
 
-        handlers.delete(handler);
+        const handlerIndex = handlers.indexOf(handler);
 
-        if (handlers.size === 0) {
-            this.handlersMap.delete(eventName);
+        if (handlerIndex === -1) {
+            return;
+        }
+
+        handlers.splice(handlerIndex, 1);
+
+        if (handlers.length === 0) {
+            delete this.handlersMap[eventName];
         }
     }
 
     public static emit(eventName: GameEvent): void {
-        const handlers = this.handlersMap.get(eventName);
+        const handlers = this.handlersMap[eventName];
 
-        if (!handlers) {
+        if (!handlers || handlers.length === 0) {
             return;
         }
 
-        for (const handler of [...handlers]) {
-            handler();
+        const handlersSnapshot = handlers.slice();
+
+        for (let index = 0; index < handlersSnapshot.length; index += 1) {
+            handlersSnapshot[index]();
         }
     }
 }

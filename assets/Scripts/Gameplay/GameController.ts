@@ -23,27 +23,27 @@ interface TutorialMessage {
     type: TutorialTextType;
 }
 
-const BUILD_SPOT_HIDDEN_STATES = new Set<GameState>([
+const BUILD_SPOT_HIDDEN_STATES: GameState[] = [
     GameState.BattleOne,
     GameState.BattleTwo,
     GameState.SkillTutorial,
     GameState.FireballCast,
     GameState.Victory,
-]);
+];
 
-const TOWER_VISIBLE_STATES = new Set<GameState>([
+const TOWER_VISIBLE_STATES: GameState[] = [
     GameState.BattleOne,
     GameState.BattleTwo,
     GameState.SkillTutorial,
     GameState.FireballCast,
     GameState.Victory,
-]);
+];
 
-const ENEMY_HIDDEN_STATES = new Set<GameState>([
+const ENEMY_HIDDEN_STATES: GameState[] = [
     GameState.TapMineTutorial,
     GameState.BuildTowerTutorial,
     GameState.Victory,
-]);
+];
 
 function getTutorialMessage(
     state: GameState,
@@ -367,8 +367,8 @@ export class GameController extends Component {
     }
 
     private stopLightWaveTweens(): void {
-        for (const lightWaveTween of this.lightWaveTweens) {
-            lightWaveTween.stop();
+        for (let index = 0; index < this.lightWaveTweens.length; index += 1) {
+            this.lightWaveTweens[index].stop();
         }
 
         this.lightWaveTweens.length = 0;
@@ -428,8 +428,8 @@ export class GameController extends Component {
     }
 
     private hideAllLightEnemies(): void {
-        for (const enemyNode of this.lightEnemyNodes) {
-            enemyNode.active = false;
+        for (let index = 0; index < this.lightEnemyNodes.length; index += 1) {
+            this.lightEnemyNodes[index].active = false;
         }
     }
 
@@ -515,7 +515,7 @@ export class GameController extends Component {
         const isBuildStep = this.currentState === GameState.BuildTowerTutorial;
 
         if (this.buildSpotNode) {
-            this.buildSpotNode.active = !BUILD_SPOT_HIDDEN_STATES.has(this.currentState);
+            this.buildSpotNode.active = !BUILD_SPOT_HIDDEN_STATES.includes(this.currentState);
         }
 
         this.buildSpotController?.setInteractionEnabled(isBuildStep);
@@ -527,11 +527,11 @@ export class GameController extends Component {
             return;
         }
 
-        this.towerNode.active = TOWER_VISIBLE_STATES.has(this.currentState);
+        this.towerNode.active = TOWER_VISIBLE_STATES.includes(this.currentState);
     }
 
     private updateEnemyView(): void {
-        if (ENEMY_HIDDEN_STATES.has(this.currentState)) {
+        if (ENEMY_HIDDEN_STATES.includes(this.currentState)) {
             this.hideAllEnemies();
         }
     }

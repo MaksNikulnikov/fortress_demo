@@ -152,7 +152,9 @@ export class TowerController extends Component {
         let bestNode: Node | null = null;
         let bestDistance = Number.POSITIVE_INFINITY;
 
-        for (const enemyNode of this.enemyNodes) {
+        for (let index = 0; index < this.enemyNodes.length; index += 1) {
+            const enemyNode = this.enemyNodes[index];
+
             if (!enemyNode?.active) {
                 continue;
             }
