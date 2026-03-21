@@ -2,7 +2,10 @@ export const GameplayConfig = {
     goldPerMineTap: 1,
     goldTargetForTowerBuild: 5,
 
-    lightEnemyMaxHealth: 3,
+    lightEnemyMaxHealth: 2,
+    lightEnemyCountInWave: 3,
+    lightEnemySpawnInterval: 0.45,
+
     heavyEnemyMaxHealth: 8,
     enemyMoveSpeed: 120,
     enemyAttackInterval: 0.8,

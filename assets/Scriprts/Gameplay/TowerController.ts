@@ -30,6 +30,7 @@ export class TowerController extends Component {
 
     private enemyController: EnemyController | null = null;
     private enemyNode: Node | null = null;
+    private enemyNodes: Node[] = [];
     private projectileController: ArrowProjectileController | null = null;
     private isBattleActive = false;
     private attackCooldown = 0;
@@ -42,8 +43,15 @@ export class TowerController extends Component {
     }
 
     public startBattle(enemyNode: Node): void {
-        this.enemyNode = enemyNode;
-        this.enemyController = enemyNode.getComponent(EnemyController);
+        this.enemyNodes = [enemyNode];
+        this.setCurrentTarget(enemyNode);
+        this.isBattleActive = true;
+        this.attackCooldown = 0;
+    }
+
+    public startBattleWithTargets(enemyNodes: Node[]): void {
+        this.enemyNodes = enemyNodes;
+        this.setCurrentTarget(this.findBestAvailableTarget());
         this.isBattleActive = true;
         this.attackCooldown = 0;
     }
@@ -53,6 +61,7 @@ export class TowerController extends Component {
         this.attackCooldown = 0;
         this.enemyNode = null;
         this.enemyController = null;
+        this.enemyNodes = [];
 
         if (this.attackTween) {
             this.attackTween.stop();
@@ -63,11 +72,13 @@ export class TowerController extends Component {
     }
 
     protected update(deltaTime: number): void {
-        if (!this.isBattleActive || !this.enemyNode || !this.enemyController) {
+        if (!this.isBattleActive) {
             return;
         }
 
-        if (!this.enemyController.isAlive()) {
+        this.ensureCurrentTarget();
+
+        if (!this.enemyNode || !this.enemyController) {
             return;
         }
 
@@ -94,18 +105,71 @@ export class TowerController extends Component {
         this.attackCooldown = this.attackInterval;
 
         if (this.projectileController) {
-            this.projectileController.shoot(sourceNode, this.enemyNode, () => {
-                if (!this.enemyController || !this.enemyController.isAlive()) {
+            const targetNode = this.enemyNode;
+            const targetController = this.enemyController;
+
+            this.projectileController.shoot(sourceNode, targetNode, () => {
+                if (!targetController.isAlive()) {
                     return;
                 }
 
-                this.enemyController.receiveDamage(this.attackDamage);
+                targetController.receiveDamage(this.attackDamage);
             });
 
             return;
         }
 
         this.enemyController.receiveDamage(this.attackDamage);
+    }
+
+    private ensureCurrentTarget(): void {
+        if (this.enemyController && this.enemyController.isAlive() && this.enemyNode?.active) {
+            return;
+        }
+
+        this.setCurrentTarget(this.findBestAvailableTarget());
+    }
+
+    private findBestAvailableTarget(): Node | null {
+        if (this.enemyNodes.length === 0) {
+            return null;
+        }
+
+        const sourceNode = this.attackPoint ?? this.node;
+        const sourcePosition = sourceNode.worldPosition;
+
+        let bestNode: Node | null = null;
+        let bestDistance = Number.POSITIVE_INFINITY;
+
+        for (const enemyNode of this.enemyNodes) {
+            if (!enemyNode?.active) {
+                continue;
+            }
+
+            const enemyController = enemyNode.getComponent(EnemyController);
+
+            if (!enemyController || !enemyController.isAlive()) {
+                continue;
+            }
+
+            const distance = Vec3.distance(sourcePosition, enemyNode.worldPosition);
+
+            if (distance > this.attackRange) {
+                continue;
+            }
+
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                bestNode = enemyNode;
+            }
+        }
+
+        return bestNode;
+    }
+
+    private setCurrentTarget(enemyNode: Node | null): void {
+        this.enemyNode = enemyNode;
+        this.enemyController = enemyNode?.getComponent(EnemyController) ?? null;
     }
 
     private playAttackFeedback(): void {

@@ -1,4 +1,4 @@
-import { _decorator, Component, Label, Node } from 'cc';
+import { _decorator, Component, Label, Node, tween } from 'cc';
 import { GameEvent } from '../Core/GameEvent';
 import { GameEventBus } from '../Core/GameEventBus';
 import { GameplayConfig } from '../Core/GameplayConfig';
@@ -36,8 +36,8 @@ export class GameController extends Component {
     @property(Node)
     public fortressNode: Node | null = null;
 
-    @property(Node)
-    public lightEnemyNode: Node | null = null;
+    @property([Node])
+    public lightEnemyNodes: Node[] = [];
 
     @property(Node)
     public heavyEnemyNode: Node | null = null;
@@ -62,13 +62,15 @@ export class GameController extends Component {
 
     private currentState: GameState = GameState.TapMineTutorial;
     private goldAmount = 0;
+    private defeatedLightEnemiesCount = 0;
+    private spawnedLightEnemiesCount = 0;
+    private hasShownBattleOneTutorial = false;
 
     private mineController: MineController | null = null;
     private buildSpotController: BuildSpotController | null = null;
     private towerController: TowerController | null = null;
     private fortressAttackController: TowerController | null = null;
     private fortressController: FortressController | null = null;
-    private lightEnemyController: EnemyController | null = null;
     private heavyEnemyController: EnemyController | null = null;
     private skillButtonController: SkillButtonController | null = null;
     private victoryOverlayController: VictoryOverlayController | null = null;
@@ -82,7 +84,6 @@ export class GameController extends Component {
         this.towerController = this.towerNode?.getComponent(TowerController) ?? null;
         this.fortressAttackController = this.fortressNode?.getComponent(TowerController) ?? null;
         this.fortressController = this.fortressNode?.getComponent(FortressController) ?? null;
-        this.lightEnemyController = this.lightEnemyNode?.getComponent(EnemyController) ?? null;
         this.heavyEnemyController = this.heavyEnemyNode?.getComponent(EnemyController) ?? null;
         this.skillButtonController = this.skillButtonNode?.getComponent(SkillButtonController) ?? null;
         this.victoryOverlayController = this.victoryOverlayNode?.getComponent(VictoryOverlayController) ?? null;
@@ -97,10 +98,16 @@ export class GameController extends Component {
         GameEventBus.on(GameEvent.EnemyAttackPerformed, this.onEnemyAttackPerformed);
         GameEventBus.on(GameEvent.SkillButtonTapped, this.onSkillButtonTapped);
         GameEventBus.on(GameEvent.FireballImpactFinished, this.onFireballImpactFinished);
+
+        this.hideAllLightEnemies();
+
+        if (this.heavyEnemyNode) {
+            this.heavyEnemyNode.active = false;
+        }
     }
 
     protected start(): void {
-        this.refreshView(true);
+        this.refreshView();
         this.emitStateChanged();
     }
 
@@ -139,16 +146,27 @@ export class GameController extends Component {
         }
 
         this.currentState = GameState.BattleOne;
+        this.defeatedLightEnemiesCount = 0;
+        this.spawnedLightEnemiesCount = 0;
+        this.hasShownBattleOneTutorial = false;
+
         this.emitStateChanged();
-        this.startFirstBattle();
+        this.startLightWave();
         this.refreshView();
     };
 
     private onEnemyDefeated = (): void => {
         if (this.currentState === GameState.BattleOne) {
-            this.currentState = GameState.BattleTwo;
-            this.emitStateChanged();
-            this.startSecondBattle();
+            this.defeatedLightEnemiesCount += 1;
+
+            if (this.defeatedLightEnemiesCount >= GameplayConfig.lightEnemyCountInWave) {
+                this.currentState = GameState.BattleTwo;
+                this.emitStateChanged();
+                this.startSecondBattle();
+                this.refreshView();
+                return;
+            }
+
             this.refreshView();
             return;
         }
@@ -170,8 +188,13 @@ export class GameController extends Component {
 
         this.currentState = GameState.SkillTutorial;
         this.emitStateChanged();
+
         this.towerController?.stopBattle();
-        this.fortressAttackController?.startBattle(this.heavyEnemyNode as Node);
+
+        if (this.heavyEnemyNode) {
+            this.fortressAttackController?.startBattle(this.heavyEnemyNode);
+        }
+
         this.refreshView();
         this.skillButtonController?.playShowAnimation();
     };
@@ -216,21 +239,58 @@ export class GameController extends Component {
         this.heavyEnemyController?.receiveDamage(GameplayConfig.skillDamage);
     };
 
-    private startFirstBattle(): void {
-        if (!this.lightEnemyController || !this.lightEnemyNode || !this.enemyPathStartNode || !this.enemyPathEndNode) {
-            return;
-        }
-
+    private startLightWave(): void {
         this.hideAllEnemies();
         this.fortressAttackController?.stopBattle();
 
-        this.lightEnemyController.startBattle(
+        for (let index = 0; index < GameplayConfig.lightEnemyCountInWave; index += 1) {
+            tween(this.node)
+                .delay(index * GameplayConfig.lightEnemySpawnInterval)
+                .call(() => {
+                    if (this.currentState !== GameState.BattleOne) {
+                        return;
+                    }
+
+                    this.spawnNextLightEnemy();
+                })
+                .start();
+        }
+    }
+
+    private spawnNextLightEnemy(): void {
+        if (!this.enemyPathStartNode || !this.enemyPathEndNode) {
+            return;
+        }
+
+        if (this.spawnedLightEnemiesCount >= GameplayConfig.lightEnemyCountInWave) {
+            return;
+        }
+
+        const nextEnemyNode = this.getAvailableLightEnemyNode();
+
+        if (!nextEnemyNode) {
+            return;
+        }
+
+        const nextEnemyController = nextEnemyNode.getComponent(EnemyController);
+
+        if (!nextEnemyController) {
+            return;
+        }
+
+        nextEnemyController.startBattle(
             this.enemyPathStartNode,
             this.enemyPathEndNode,
             GameplayConfig.lightEnemyMaxHealth
         );
 
-        this.towerController?.startBattle(this.lightEnemyNode);
+        this.spawnedLightEnemiesCount += 1;
+
+        this.towerController?.startBattleWithTargets(this.lightEnemyNodes);
+    }
+
+    private getAvailableLightEnemyNode(): Node | null {
+        return this.lightEnemyNodes.find((enemyNode) => !enemyNode.active) ?? null;
     }
 
     private startSecondBattle(): void {
@@ -250,10 +310,14 @@ export class GameController extends Component {
         this.towerController?.startBattle(this.heavyEnemyNode);
     }
 
-    private hideAllEnemies(): void {
-        if (this.lightEnemyNode) {
-            this.lightEnemyNode.active = false;
+    private hideAllLightEnemies(): void {
+        for (const enemyNode of this.lightEnemyNodes) {
+            enemyNode.active = false;
         }
+    }
+
+    private hideAllEnemies(): void {
+        this.hideAllLightEnemies();
 
         if (this.heavyEnemyNode) {
             this.heavyEnemyNode.active = false;
@@ -266,9 +330,9 @@ export class GameController extends Component {
         });
     }
 
-    private refreshView(isInitialRefresh = false): void {
+    private refreshView(): void {
         this.updateGoldLabel();
-        this.updateTutorialLabel(isInitialRefresh);
+        this.updateTutorialLabel();
         this.updateMineView();
         this.updateBuildSpotView();
         this.updateTowerView();
@@ -297,17 +361,17 @@ export class GameController extends Component {
             : `Gold: ${this.goldAmount}`;
     }
 
-    private updateTutorialLabel(isInitialRefresh: boolean): void {
+    private updateTutorialLabel(): void {
         const tutorialText = this.getTutorialText();
 
         if (this.tutorialLabelController) {
             if (tutorialText.type === 'persistent') {
                 this.tutorialLabelController.showPersistentText(tutorialText.text);
             } else if (tutorialText.type === 'temporary') {
-                if (isInitialRefresh) {
-                    this.tutorialLabelController.showTemporaryText(tutorialText.text);
-                } else {
-                    this.tutorialLabelController.showTemporaryText(tutorialText.text);
+                this.tutorialLabelController.showTemporaryText(tutorialText.text);
+
+                if (this.currentState === GameState.BattleOne) {
+                    this.hasShownBattleOneTutorial = true;
                 }
             } else {
                 this.tutorialLabelController.hide();
@@ -321,6 +385,10 @@ export class GameController extends Component {
         }
 
         this.tutorialLabel.string = tutorialText.text;
+
+        if (tutorialText.type === 'temporary' && this.currentState === GameState.BattleOne) {
+            this.hasShownBattleOneTutorial = true;
+        }
     }
 
     private updateMineView(): void {
@@ -396,8 +464,8 @@ export class GameController extends Component {
 
             case GameState.BattleOne:
                 return {
-                    text: 'Defend the fortress',
-                    type: 'temporary',
+                    text: this.hasShownBattleOneTutorial ? '' : 'Defend the fortress',
+                    type: this.hasShownBattleOneTutorial ? 'hidden' : 'temporary',
                 };
 
             case GameState.BattleTwo:
