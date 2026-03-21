@@ -1,5 +1,6 @@
 import { _decorator, Component, Node, tween, Tween, Vec3 } from 'cc';
 import { GameplayConfig } from '../Core/GameplayConfig';
+import { ArrowProjectileController } from './ArrowProjectileController';
 import { EnemyController } from './EnemyController';
 
 const { ccclass, property } = _decorator;
@@ -9,6 +10,18 @@ export class TowerController extends Component {
     @property(Node)
     public attackPoint: Node | null = null;
 
+    @property(Node)
+    public projectileNode: Node | null = null;
+
+    @property
+    public attackRange = GameplayConfig.towerAttackRange;
+
+    @property
+    public attackInterval = GameplayConfig.towerAttackInterval;
+
+    @property
+    public attackDamage = GameplayConfig.towerDamage;
+
     @property
     public attackPunchScaleMultiplier = 1.08;
 
@@ -17,6 +30,7 @@ export class TowerController extends Component {
 
     private enemyController: EnemyController | null = null;
     private enemyNode: Node | null = null;
+    private projectileController: ArrowProjectileController | null = null;
     private isBattleActive = false;
     private attackCooldown = 0;
     private baseScale = new Vec3(1, 1, 1);
@@ -24,6 +38,7 @@ export class TowerController extends Component {
 
     protected onLoad(): void {
         this.baseScale.set(this.node.scale);
+        this.projectileController = this.projectileNode?.getComponent(ArrowProjectileController) ?? null;
     }
 
     public startBattle(enemyNode: Node): void {
@@ -56,6 +71,10 @@ export class TowerController extends Component {
             return;
         }
 
+        if (this.projectileController?.isBusy()) {
+            return;
+        }
+
         this.attackCooldown -= deltaTime;
 
         if (this.attackCooldown > 0) {
@@ -65,16 +84,28 @@ export class TowerController extends Component {
         const sourceNode = this.attackPoint ?? this.node;
         const sourcePosition = sourceNode.worldPosition;
         const enemyPosition = this.enemyNode.worldPosition;
-
         const distance = Vec3.distance(sourcePosition, enemyPosition);
 
-        if (distance > GameplayConfig.towerAttackRange) {
+        if (distance > this.attackRange) {
             return;
         }
 
         this.playAttackFeedback();
-        this.enemyController.receiveDamage(GameplayConfig.towerDamage);
-        this.attackCooldown = GameplayConfig.towerAttackInterval;
+        this.attackCooldown = this.attackInterval;
+
+        if (this.projectileController) {
+            this.projectileController.shoot(sourceNode, this.enemyNode, () => {
+                if (!this.enemyController || !this.enemyController.isAlive()) {
+                    return;
+                }
+
+                this.enemyController.receiveDamage(this.attackDamage);
+            });
+
+            return;
+        }
+
+        this.enemyController.receiveDamage(this.attackDamage);
     }
 
     private playAttackFeedback(): void {

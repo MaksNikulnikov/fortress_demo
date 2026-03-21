@@ -5,11 +5,17 @@ export const GameplayConfig = {
     lightEnemyMaxHealth: 3,
     heavyEnemyMaxHealth: 8,
     enemyMoveSpeed: 120,
+    enemyAttackInterval: 0.8,
 
     towerAttackRange: 260,
     towerAttackInterval: 0.6,
     towerDamage: 1,
 
+    fortressAttackRange: 420,
+    fortressAttackInterval: 0.9,
+    fortressDamage: 1,
+
+    arrowFlightDuration: 0.16,
     skillDamage: 999,
 
     fireballFlightDuration: 0.45,

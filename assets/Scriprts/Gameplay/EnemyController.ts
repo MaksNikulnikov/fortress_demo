@@ -25,16 +25,19 @@ export class EnemyController extends Component {
     public bodyOpacity: UIOpacity | null = null;
 
     @property
-    public walkAnimationName = '';
+    public walkAnimationName = 'walk';
 
     @property
-    public attackAnimationName = '';
+    public attackAnimationName = 'attack';
 
     @property
-    public deathAnimationName = '';
+    public deathAnimationName = 'death';
 
     @property
     public canAttackAtGoal = false;
+
+    @property
+    public attackInterval = GameplayConfig.enemyAttackInterval;
 
     @property
     public deathFadeDelay = 1;
@@ -47,6 +50,7 @@ export class EnemyController extends Component {
     private movementDirection = new Vec3();
     private currentPhase: EnemyPhase = EnemyPhase.Idle;
     private hasReachedGoal = false;
+    private attackCooldown = 0;
     private hitTween: Tween<Sprite> | null = null;
     private fadeTween: Tween<UIOpacity> | null = null;
 
@@ -79,29 +83,18 @@ export class EnemyController extends Component {
     }
 
     protected update(deltaTime: number): void {
-        if (this.currentPhase !== EnemyPhase.Moving || !this.moveTarget || !this.node.active) {
+        if (!this.node.active) {
             return;
         }
 
-        const currentPosition = this.node.worldPosition;
-        const targetPosition = this.moveTarget.worldPosition;
-
-        Vec3.subtract(this.movementDirection, targetPosition, currentPosition);
-        const distanceToTarget = this.movementDirection.length();
-
-        if (distanceToTarget <= GameplayConfig.enemyMoveSpeed * deltaTime) {
-            this.node.setWorldPosition(targetPosition);
-            this.onReachedGoal();
+        if (this.currentPhase === EnemyPhase.Moving) {
+            this.updateMovement(deltaTime);
             return;
         }
 
-        this.movementDirection.normalize();
-
-        this.node.setWorldPosition(
-            currentPosition.x + this.movementDirection.x * GameplayConfig.enemyMoveSpeed * deltaTime,
-            currentPosition.y + this.movementDirection.y * GameplayConfig.enemyMoveSpeed * deltaTime,
-            currentPosition.z + this.movementDirection.z * GameplayConfig.enemyMoveSpeed * deltaTime
-        );
+        if (this.currentPhase === EnemyPhase.Attacking) {
+            this.updateAttack(deltaTime);
+        }
     }
 
     public startBattle(startNode: Node, endNode: Node, maxHealth: number): void {
@@ -112,6 +105,7 @@ export class EnemyController extends Component {
         this.moveTarget = endNode;
         this.currentPhase = EnemyPhase.Moving;
         this.hasReachedGoal = false;
+        this.attackCooldown = 0;
 
         this.node.active = true;
         this.node.setWorldPosition(startNode.worldPosition);
@@ -151,10 +145,48 @@ export class EnemyController extends Component {
         return this.node.active && this.currentPhase !== EnemyPhase.Dying && this.currentPhase !== EnemyPhase.Dead;
     }
 
+    private updateMovement(deltaTime: number): void {
+        if (!this.moveTarget) {
+            return;
+        }
+
+        const currentPosition = this.node.worldPosition;
+        const targetPosition = this.moveTarget.worldPosition;
+
+        Vec3.subtract(this.movementDirection, targetPosition, currentPosition);
+        const distanceToTarget = this.movementDirection.length();
+
+        if (distanceToTarget <= GameplayConfig.enemyMoveSpeed * deltaTime) {
+            this.node.setWorldPosition(targetPosition);
+            this.onReachedGoal();
+            return;
+        }
+
+        this.movementDirection.normalize();
+
+        this.node.setWorldPosition(
+            currentPosition.x + this.movementDirection.x * GameplayConfig.enemyMoveSpeed * deltaTime,
+            currentPosition.y + this.movementDirection.y * GameplayConfig.enemyMoveSpeed * deltaTime,
+            currentPosition.z + this.movementDirection.z * GameplayConfig.enemyMoveSpeed * deltaTime
+        );
+    }
+
+    private updateAttack(deltaTime: number): void {
+        this.attackCooldown -= deltaTime;
+
+        if (this.attackCooldown > 0) {
+            return;
+        }
+
+        this.attackCooldown = this.attackInterval;
+        GameEventBus.emit(GameEvent.EnemyAttackPerformed);
+    }
+
     private onReachedGoal(): void {
         this.currentPhase = this.canAttackAtGoal ? EnemyPhase.Attacking : EnemyPhase.Idle;
 
         if (this.canAttackAtGoal) {
+            this.attackCooldown = 0;
             this.playAnimation(this.attackAnimationName);
 
             if (!this.hasReachedGoal) {
