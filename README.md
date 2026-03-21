@@ -58,7 +58,9 @@ Required setup:
 
 1. Register a Windows self-hosted runner for the repository.
 2. Make sure `Cocos Creator 3.8.8` is installed on that runner machine.
-3. In `Settings -> Pages`, set the source to `GitHub Actions`.
-4. Optionally create a repository variable named `COCOS_CREATOR_EXE` if Creator is installed somewhere other than `C:\ProgramData\cocos\editors\Creator\3.8.8\CocosCreator.exe`.
+3. Keep the runner in a clean desktop session with no interactive `Cocos Creator` window already open. The command-line build can attach to an existing editor session instead of running headless enough for CI.
+4. If the runner machine inherits `ELECTRON_RUN_AS_NODE`, let the workflow override it. Otherwise `CocosCreator.exe` starts as a Node process and rejects `--project`.
+5. In `Settings -> Pages`, set the source to `GitHub Actions`.
+6. Optionally create a repository variable named `COCOS_CREATOR_EXE` if Creator is installed somewhere other than `C:\ProgramData\cocos\editors\Creator\3.8.8\CocosCreator.exe`.
 
-The build step is handled by [scripts/build-pages.ps1](scripts/build-pages.ps1). It tries both official Cocos CLI argument styles, `--project` and `--path`, and publishes the generated web build as the Pages artifact.
+The build step is handled by [scripts/build-pages.ps1](scripts/build-pages.ps1). It launches Creator with `--project`, uses an isolated Cocos home directory for CI, clears inherited Electron runtime flags, and publishes the generated web build as the Pages artifact.

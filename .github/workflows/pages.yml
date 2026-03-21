@@ -18,6 +18,7 @@ concurrency:
 
 jobs:
   build:
+    timeout-minutes: 20
     runs-on:
       - self-hosted
       - windows
@@ -25,6 +26,8 @@ jobs:
     env:
       COCOS_CREATOR_EXE: ${{ vars.COCOS_CREATOR_EXE }}
       COCOS_BUILD_PLATFORM: web-desktop
+      COCOS_HOME_DIR: ${{ runner.temp }}\cocos-home
+      ELECTRON_RUN_AS_NODE: ''
       PAGES_OUTPUT_DIR: ${{ github.workspace }}\.pages-dist
     steps:
       - name: Checkout
@@ -38,6 +41,7 @@ jobs:
         run: >
           .\scripts\build-pages.ps1
           -Platform $env:COCOS_BUILD_PLATFORM
+          -HomePath $env:COCOS_HOME_DIR
           -OutputPath $env:PAGES_OUTPUT_DIR
 
       - name: Upload Pages artifact

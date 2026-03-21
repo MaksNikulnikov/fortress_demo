@@ -7,6 +7,9 @@ temp/
 local/
 build/
 .pages-dist/
+.cocos-home/
+.cocos-home-smoke/
+.cocos-ci-logs/
 profiles/
 native
 #//////////////////////////
