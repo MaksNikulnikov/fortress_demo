@@ -1,35 +1,22 @@
 import { _decorator, Component, Node, tween, Tween, Vec3 } from 'cc';
-import { GameEvent } from '../Core/GameEvent';
-import { GameEventBus } from '../Core/GameEventBus';
-import { HighlightController } from './HighlightController';
 
 const { ccclass, property } = _decorator;
 
-@ccclass('SkillButtonController')
-export class SkillButtonController extends Component {
-    @property(Node)
-    public highlightNode: Node | null = null;
-
+@ccclass('CtaButtonController')
+export class CtaButtonController extends Component {
     @property
-    public pressScaleMultiplier = 0.92;
+    public pressScaleMultiplier = 0.94;
 
     @property
     public pressDuration = 0.08;
 
-    @property
-    public showPunchScaleMultiplier = 1.06;
-
-    private isInteractionEnabled = false;
-    private highlightController: HighlightController | null = null;
+    private isInteractionEnabled = true;
     private baseScale = new Vec3(1, 1, 1);
     private pressTween: Tween<Node> | null = null;
 
     protected onLoad(): void {
         this.node.on(Node.EventType.TOUCH_END, this.onTouchEnd, this);
-        this.highlightController = this.highlightNode?.getComponent(HighlightController) ?? null;
         this.baseScale.set(this.node.scale);
-        this.setHighlightVisible(false);
-        this.setInteractionEnabled(false);
     }
 
     protected onDestroy(): void {
@@ -45,21 +32,15 @@ export class SkillButtonController extends Component {
         this.isInteractionEnabled = isEnabled;
     }
 
-    public setHighlightVisible(isVisible: boolean): void {
-        this.highlightController?.setHighlightVisible(isVisible);
-    }
-
     public playShowAnimation(): void {
-        const showScale = new Vec3(
-            this.baseScale.x * this.showPunchScaleMultiplier,
-            this.baseScale.y * this.showPunchScaleMultiplier,
+        this.node.setScale(
+            this.baseScale.x * 0.9,
+            this.baseScale.y * 0.9,
             this.baseScale.z
         );
 
-        this.node.setScale(showScale);
-
         tween(this.node)
-            .to(0.18, { scale: this.baseScale.clone() }, { easing: 'backOut' })
+            .to(0.22, { scale: this.baseScale.clone() }, { easing: 'backOut' })
             .start();
     }
 
@@ -67,8 +48,6 @@ export class SkillButtonController extends Component {
         if (!this.isInteractionEnabled) {
             return;
         }
-
-        this.isInteractionEnabled = false;
 
         if (this.pressTween) {
             this.pressTween.stop();
@@ -84,8 +63,33 @@ export class SkillButtonController extends Component {
             .to(this.pressDuration, { scale: pressedScale })
             .to(this.pressDuration, { scale: this.baseScale.clone() })
             .call(() => {
-                GameEventBus.emit(GameEvent.SkillButtonTapped);
+                this.fireCta();
             })
             .start();
+    }
+
+    private fireCta(): void {
+        const globalWindow = window as Window & {
+            openStore?: () => void;
+            install?: () => void;
+            cta?: () => void;
+        };
+
+        if (typeof globalWindow.openStore === 'function') {
+            globalWindow.openStore();
+            return;
+        }
+
+        if (typeof globalWindow.install === 'function') {
+            globalWindow.install();
+            return;
+        }
+
+        if (typeof globalWindow.cta === 'function') {
+            globalWindow.cta();
+            return;
+        }
+
+        console.log('[CtaButtonController] CTA clicked');
     }
 }

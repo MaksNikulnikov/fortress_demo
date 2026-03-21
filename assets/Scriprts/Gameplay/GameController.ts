@@ -1,4 +1,4 @@
-import { _decorator, Component, Label, Node } from 'cc';
+import { _decorator, Component, Label, Node, tween, Vec3 } from 'cc';
 import { GameEvent } from '../Core/GameEvent';
 import { GameEventBus } from '../Core/GameEventBus';
 import { GameplayConfig } from '../Core/GameplayConfig';
@@ -47,6 +47,12 @@ export class GameController extends Component {
     @property(Node)
     public victoryOverlayNode: Node | null = null;
 
+    @property
+    public victoryDelay = 0.2;
+
+    @property
+    public skillImpactScaleMultiplier = 1.03;
+
     private currentState: GameState = GameState.TapMineTutorial;
     private goldAmount = 0;
 
@@ -57,6 +63,7 @@ export class GameController extends Component {
     private heavyEnemyController: EnemyController | null = null;
     private skillButtonController: SkillButtonController | null = null;
     private victoryOverlayController: VictoryOverlayController | null = null;
+    private canvasBaseScale = new Vec3(1, 1, 1);
 
     protected onLoad(): void {
         this.mineController = this.mineNode?.getComponent(MineController) ?? null;
@@ -66,6 +73,8 @@ export class GameController extends Component {
         this.heavyEnemyController = this.heavyEnemyNode?.getComponent(EnemyController) ?? null;
         this.skillButtonController = this.skillButtonNode?.getComponent(SkillButtonController) ?? null;
         this.victoryOverlayController = this.victoryOverlayNode?.getComponent(VictoryOverlayController) ?? null;
+
+        this.canvasBaseScale.set(this.node.scale);
 
         GameEventBus.on(GameEvent.MineTapped, this.onMineTapped);
         GameEventBus.on(GameEvent.BuildSpotTapped, this.onBuildSpotTapped);
@@ -131,7 +140,14 @@ export class GameController extends Component {
             this.emitStateChanged();
             this.towerController?.stopBattle();
             this.refreshView();
-            this.victoryOverlayController?.show();
+
+            tween(this.node)
+                .delay(this.victoryDelay)
+                .call(() => {
+                    this.victoryOverlayController?.show();
+                    this.victoryOverlayController?.playFlash();
+                })
+                .start();
         }
     };
 
@@ -144,6 +160,7 @@ export class GameController extends Component {
         this.emitStateChanged();
         this.towerController?.stopBattle();
         this.refreshView();
+        this.skillButtonController?.playShowAnimation();
     };
 
     private onSkillButtonTapped = (): void => {
@@ -153,6 +170,8 @@ export class GameController extends Component {
 
         this.skillButtonController?.setInteractionEnabled(false);
         this.skillButtonController?.setHighlightVisible(false);
+
+        this.playSkillImpactFeedback();
         this.heavyEnemyController?.receiveDamage(GameplayConfig.skillDamage);
     };
 
@@ -196,6 +215,19 @@ export class GameController extends Component {
         if (this.heavyEnemyNode) {
             this.heavyEnemyNode.active = false;
         }
+    }
+
+    private playSkillImpactFeedback(): void {
+        const impactScale = new Vec3(
+            this.canvasBaseScale.x * this.skillImpactScaleMultiplier,
+            this.canvasBaseScale.y * this.skillImpactScaleMultiplier,
+            this.canvasBaseScale.z
+        );
+
+        tween(this.node)
+            .to(0.06, { scale: impactScale })
+            .to(0.08, { scale: this.canvasBaseScale.clone() })
+            .start();
     }
 
     private emitStateChanged(): void {

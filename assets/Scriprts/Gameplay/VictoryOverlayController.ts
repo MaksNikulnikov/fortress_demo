@@ -1,4 +1,5 @@
 import { _decorator, Component, Node, tween, Tween, UIOpacity, Vec3 } from 'cc';
+import { CtaButtonController } from './CtaButtonController';
 
 const { ccclass, property } = _decorator;
 
@@ -13,13 +14,20 @@ export class VictoryOverlayController extends Component {
     @property(UIOpacity)
     public panelOpacity: UIOpacity | null = null;
 
+    @property(Node)
+    public ctaButtonNode: Node | null = null;
+
     @property
     public dimmerTargetOpacity = 180;
 
     @property
     public showDuration = 0.3;
 
+    @property
+    public ctaDelay = 0.12;
+
     private basePanelScale = new Vec3(1, 1, 1);
+    private ctaButtonController: CtaButtonController | null = null;
     private dimmerTween: Tween<UIOpacity> | null = null;
     private panelScaleTween: Tween<Node> | null = null;
     private panelOpacityTween: Tween<UIOpacity> | null = null;
@@ -29,6 +37,7 @@ export class VictoryOverlayController extends Component {
             this.basePanelScale.set(this.panelNode.scale);
         }
 
+        this.ctaButtonController = this.ctaButtonNode?.getComponent(CtaButtonController) ?? null;
         this.hideImmediately();
     }
 
@@ -47,10 +56,14 @@ export class VictoryOverlayController extends Component {
 
         if (this.panelNode) {
             this.panelNode.setScale(
-                this.basePanelScale.x * 0.92,
-                this.basePanelScale.y * 0.92,
+                this.basePanelScale.x * 0.9,
+                this.basePanelScale.y * 0.9,
                 this.basePanelScale.z
             );
+        }
+
+        if (this.ctaButtonNode) {
+            this.ctaButtonNode.active = false;
         }
 
         if (this.dimmerOpacity) {
@@ -68,8 +81,37 @@ export class VictoryOverlayController extends Component {
         if (this.panelNode) {
             this.panelScaleTween = tween(this.panelNode)
                 .to(this.showDuration, { scale: this.basePanelScale.clone() }, { easing: 'backOut' })
+                .call(() => {
+                    this.showCtaButton();
+                })
                 .start();
         }
+    }
+
+    public playFlash(): void {
+        if (!this.dimmerOpacity) {
+            return;
+        }
+
+        tween(this.dimmerOpacity)
+            .to(0.08, { opacity: Math.min(this.dimmerTargetOpacity + 40, 255) })
+            .to(0.12, { opacity: this.dimmerTargetOpacity })
+            .start();
+    }
+
+    private showCtaButton(): void {
+        if (!this.ctaButtonNode) {
+            return;
+        }
+
+        this.ctaButtonNode.active = true;
+
+        tween(this.ctaButtonNode)
+            .delay(this.ctaDelay)
+            .call(() => {
+                this.ctaButtonController?.playShowAnimation();
+            })
+            .start();
     }
 
     private hideImmediately(): void {
@@ -83,6 +125,10 @@ export class VictoryOverlayController extends Component {
 
         if (this.panelNode) {
             this.panelNode.setScale(this.basePanelScale);
+        }
+
+        if (this.ctaButtonNode) {
+            this.ctaButtonNode.active = false;
         }
 
         this.node.active = false;
