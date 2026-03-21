@@ -26,9 +26,7 @@ jobs:
     env:
       COCOS_CREATOR_EXE: ${{ vars.COCOS_CREATOR_EXE }}
       COCOS_BUILD_PLATFORM: web-desktop
-      COCOS_HOME_DIR: ${{ runner.temp }}\cocos-home
       ELECTRON_RUN_AS_NODE: ''
-      PAGES_OUTPUT_DIR: ${{ github.workspace }}\.pages-dist
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -41,8 +39,7 @@ jobs:
         run: >
           .\scripts\build-pages.ps1
           -Platform $env:COCOS_BUILD_PLATFORM
-          -HomePath $env:COCOS_HOME_DIR
-          -OutputPath $env:PAGES_OUTPUT_DIR
+          -OutputPath "$env:GITHUB_WORKSPACE\.pages-dist"
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
