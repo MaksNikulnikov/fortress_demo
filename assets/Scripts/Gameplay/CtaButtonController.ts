@@ -1,12 +1,6 @@
-import { _decorator, Component, Node, tween, Tween, Vec3 } from 'cc';
+import { _decorator, Component, director, Node, tween, Tween, Vec3 } from 'cc';
 
 const { ccclass, property } = _decorator;
-
-type GlobalCtaWindow = Window & {
-    openStore?: () => void;
-    install?: () => void;
-    cta?: () => void;
-};
 
 @ccclass('CtaButtonController')
 export class CtaButtonController extends Component {
@@ -65,6 +59,8 @@ export class CtaButtonController extends Component {
             return;
         }
 
+        this.isInteractionEnabled = false;
+
         if (this.pressTween) {
             this.pressTween.stop();
         }
@@ -79,37 +75,18 @@ export class CtaButtonController extends Component {
             .to(this.pressDuration, { scale: pressedScale })
             .to(this.pressDuration, { scale: this.baseScale.clone() })
             .call(() => {
-                this.fireCta();
+                this.restartCurrentScene();
             })
             .start();
     }
 
-    private fireCta(): void {
-        const globalWindow = window as GlobalCtaWindow;
+    private restartCurrentScene(): void {
+        const currentScene = director.getScene();
 
-        if (typeof globalWindow.openStore === 'function') {
-            globalWindow.openStore();
+        if (!currentScene) {
             return;
         }
 
-        if (typeof globalWindow.install === 'function') {
-            globalWindow.install();
-            return;
-        }
-
-        if (typeof globalWindow.cta === 'function') {
-            globalWindow.cta();
-            return;
-        }
-
-        if (typeof globalWindow.dispatchEvent !== 'function') {
-            return;
-        }
-
-        const ctaEvent = typeof CustomEvent === 'function'
-            ? new CustomEvent('fortress-demo:cta')
-            : new Event('fortress-demo:cta');
-
-        globalWindow.dispatchEvent(ctaEvent);
+        director.loadScene(currentScene.name);
     }
 }

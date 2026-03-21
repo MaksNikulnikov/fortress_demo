@@ -234,7 +234,7 @@ export class GameController extends Component {
             return;
         }
 
-        if (this.currentState === GameState.FireballCast) {
+        if (this.isHeavyEnemyBattleState()) {
             this.enterVictory();
         }
     };
@@ -337,6 +337,12 @@ export class GameController extends Component {
 
         this.refreshView();
         this.victoryOverlayController?.show();
+    }
+
+    private isHeavyEnemyBattleState(): boolean {
+        return this.currentState === GameState.BattleTwo
+            || this.currentState === GameState.SkillTutorial
+            || this.currentState === GameState.FireballCast;
     }
 
     private startLightWave(): void {
