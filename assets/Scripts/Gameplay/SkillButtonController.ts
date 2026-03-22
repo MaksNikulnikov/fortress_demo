@@ -50,6 +50,8 @@ export class SkillButtonController extends Component {
     }
 
     public playShowAnimation(): void {
+        this.baseScale.set(this.node.scale);
+
         const showScale = new Vec3(
             this.baseScale.x * this.showPunchScaleMultiplier,
             this.baseScale.y * this.showPunchScaleMultiplier,
@@ -69,6 +71,7 @@ export class SkillButtonController extends Component {
         }
 
         this.isInteractionEnabled = false;
+        this.baseScale.set(this.node.scale);
 
         if (this.pressTween) {
             this.pressTween.stop();

@@ -1,4 +1,4 @@
-import { _decorator, Component, Label, Node, tween, Tween } from 'cc';
+import { _decorator, Component, Label, macro, Node, sys, tween, Tween, UITransform, Vec3, view } from 'cc';
 import { GameEvent } from '../Core/GameEvent';
 import { GameEventBus } from '../Core/GameEventBus';
 import { GameplayConfig } from '../Core/GameplayConfig';
@@ -21,6 +21,17 @@ type TutorialTextType = 'persistent' | 'temporary' | 'hidden';
 interface TutorialMessage {
     text: string;
     type: TutorialTextType;
+}
+
+interface ResponsiveLabelMetrics {
+    position: Vec3;
+    fontSize: number;
+    lineHeight: number;
+}
+
+interface ResponsiveNodeMetrics {
+    position: Vec3;
+    scale: Vec3;
 }
 
 const BUILD_SPOT_HIDDEN_STATES: GameState[] = [
@@ -93,6 +104,11 @@ function getTutorialMessage(
 
 @ccclass('GameController')
 export class GameController extends Component {
+    private static readonly designWidth = 1280;
+    private static readonly designHeight = 720;
+    private static readonly minimumHudScale = 0.8;
+    private static readonly minimumPanelScale = 0.86;
+
     @property(Label)
     public goldLabel: Label | null = null;
 
@@ -153,6 +169,12 @@ export class GameController extends Component {
     private fireballController: FireballController | null = null;
     private tutorialLabelController: TutorialLabelController | null = null;
     private goldCounterController: GoldCounterController | null = null;
+    private goldLabelMetrics: ResponsiveLabelMetrics | null = null;
+    private tutorialLabelMetrics: ResponsiveLabelMetrics | null = null;
+    private skillButtonMetrics: ResponsiveNodeMetrics | null = null;
+    private victoryPanelMetrics: ResponsiveNodeMetrics | null = null;
+    private lastVisibleWidth = 0;
+    private lastVisibleHeight = 0;
 
     protected onLoad(): void {
         this.mineController = this.mineNode?.getComponent(MineController) ?? null;
@@ -174,6 +196,8 @@ export class GameController extends Component {
         GameEventBus.on(GameEvent.EnemyAttackPerformed, this.onEnemyAttackPerformed);
         GameEventBus.on(GameEvent.SkillButtonTapped, this.onSkillButtonTapped);
         GameEventBus.on(GameEvent.FireballImpactFinished, this.onFireballImpactFinished);
+        view.on('canvas-resize', this.onCanvasResize, this);
+        view.on('design-resolution-changed', this.onCanvasResize, this);
 
         this.hideAllLightEnemies();
 
@@ -183,6 +207,9 @@ export class GameController extends Component {
     }
 
     protected start(): void {
+        this.enforceLandscapeOrientation();
+        this.cacheResponsiveMetrics();
+        this.applyResponsiveLayout();
         this.refreshView();
     }
 
@@ -194,9 +221,16 @@ export class GameController extends Component {
         GameEventBus.off(GameEvent.EnemyAttackPerformed, this.onEnemyAttackPerformed);
         GameEventBus.off(GameEvent.SkillButtonTapped, this.onSkillButtonTapped);
         GameEventBus.off(GameEvent.FireballImpactFinished, this.onFireballImpactFinished);
+        view.off('canvas-resize', this.onCanvasResize, this);
+        view.off('design-resolution-changed', this.onCanvasResize, this);
 
         this.stopLightWaveTweens();
     }
+
+    private onCanvasResize = (): void => {
+        this.enforceLandscapeOrientation();
+        this.applyResponsiveLayout();
+    };
 
     private onMineTapped = (): void => {
         if (this.currentState !== GameState.TapMineTutorial) {
@@ -442,6 +476,7 @@ export class GameController extends Component {
     }
 
     private refreshView(): void {
+        this.applyResponsiveLayout();
         this.updateGoldLabel();
         this.updateTutorialLabel();
         this.updateMineView();
@@ -546,5 +581,195 @@ export class GameController extends Component {
         this.skillButtonNode.active = isSkillStep;
         this.skillButtonController?.setInteractionEnabled(isSkillStep);
         this.skillButtonController?.setHighlightVisible(isSkillStep);
+    }
+
+    private cacheResponsiveMetrics(): void {
+        if (!this.goldLabelMetrics && this.goldLabel) {
+            this.goldLabelMetrics = {
+                position: this.goldLabel.node.position.clone(),
+                fontSize: this.goldLabel.fontSize,
+                lineHeight: this.goldLabel.lineHeight,
+            };
+        }
+
+        if (!this.tutorialLabelMetrics && this.tutorialLabel) {
+            this.tutorialLabelMetrics = {
+                position: this.tutorialLabel.node.position.clone(),
+                fontSize: this.tutorialLabel.fontSize,
+                lineHeight: this.tutorialLabel.lineHeight,
+            };
+        }
+
+        if (!this.skillButtonMetrics && this.skillButtonNode) {
+            this.skillButtonMetrics = {
+                position: this.skillButtonNode.position.clone(),
+                scale: this.skillButtonNode.scale.clone(),
+            };
+        }
+
+        if (!this.victoryPanelMetrics && this.victoryOverlayController?.panelNode) {
+            this.victoryPanelMetrics = {
+                position: this.victoryOverlayController.panelNode.position.clone(),
+                scale: this.victoryOverlayController.panelNode.scale.clone(),
+            };
+        }
+    }
+
+    private applyResponsiveLayout(): void {
+        this.cacheResponsiveMetrics();
+
+        const visibleSize = view.getVisibleSize();
+        if (visibleSize.width <= 0 || visibleSize.height <= 0) {
+            return;
+        }
+
+        if (visibleSize.width === this.lastVisibleWidth && visibleSize.height === this.lastVisibleHeight) {
+            return;
+        }
+
+        this.lastVisibleWidth = visibleSize.width;
+        this.lastVisibleHeight = visibleSize.height;
+
+        const designWidth = GameController.designWidth;
+        const designHeight = GameController.designHeight;
+        const halfVisibleWidth = visibleSize.width * 0.5;
+        const halfVisibleHeight = visibleSize.height * 0.5;
+        const widthScale = Math.min(visibleSize.width / designWidth, 1);
+        const heightScale = Math.min(visibleSize.height / designHeight, 1);
+        const hudScale = this.clampValue(
+            Math.min(widthScale, heightScale),
+            GameController.minimumHudScale,
+            1
+        );
+        const panelScale = this.clampValue(
+            Math.min(widthScale, heightScale),
+            GameController.minimumPanelScale,
+            1
+        );
+
+        this.applyCornerLabelLayout(
+            this.goldLabel,
+            this.goldLabelMetrics,
+            halfVisibleWidth,
+            halfVisibleHeight,
+            hudScale,
+            true
+        );
+        this.applyBottomCenterLabelLayout(
+            this.tutorialLabel,
+            this.tutorialLabelMetrics,
+            halfVisibleHeight,
+            hudScale
+        );
+        this.applySkillButtonLayout(halfVisibleWidth, halfVisibleHeight, hudScale);
+        this.applyVictoryOverlayLayout(visibleSize.width, visibleSize.height, panelScale);
+    }
+
+    private applyCornerLabelLayout(
+        label: Label | null,
+        metrics: ResponsiveLabelMetrics | null,
+        halfVisibleWidth: number,
+        halfVisibleHeight: number,
+        hudScale: number,
+        isLeftAligned: boolean
+    ): void {
+        if (!label || !metrics) {
+            return;
+        }
+
+        const leftMargin = (GameController.designWidth * 0.5) + metrics.position.x;
+        const topMargin = (GameController.designHeight * 0.5) - metrics.position.y;
+        const x = isLeftAligned
+            ? (-halfVisibleWidth + leftMargin * hudScale)
+            : (halfVisibleWidth - leftMargin * hudScale);
+        const y = halfVisibleHeight - topMargin * hudScale;
+
+        label.node.setPosition(x, y, metrics.position.z);
+        label.fontSize = Math.round(metrics.fontSize * hudScale);
+        label.lineHeight = Math.round(metrics.lineHeight * hudScale);
+    }
+
+    private applyBottomCenterLabelLayout(
+        label: Label | null,
+        metrics: ResponsiveLabelMetrics | null,
+        halfVisibleHeight: number,
+        hudScale: number
+    ): void {
+        if (!label || !metrics) {
+            return;
+        }
+
+        const bottomMargin = metrics.position.y + (GameController.designHeight * 0.5);
+        label.node.setPosition(
+            metrics.position.x,
+            (-halfVisibleHeight + bottomMargin * hudScale),
+            metrics.position.z
+        );
+        label.fontSize = Math.round(metrics.fontSize * hudScale);
+        label.lineHeight = Math.round(metrics.lineHeight * hudScale);
+    }
+
+    private applySkillButtonLayout(
+        halfVisibleWidth: number,
+        halfVisibleHeight: number,
+        hudScale: number
+    ): void {
+        if (!this.skillButtonNode || !this.skillButtonMetrics) {
+            return;
+        }
+
+        const rightMargin = (GameController.designWidth * 0.5) - this.skillButtonMetrics.position.x;
+        const topMargin = (GameController.designHeight * 0.5) - this.skillButtonMetrics.position.y;
+
+        this.skillButtonNode.setPosition(
+            halfVisibleWidth - rightMargin * hudScale,
+            halfVisibleHeight - topMargin * hudScale,
+            this.skillButtonMetrics.position.z
+        );
+        this.skillButtonNode.setScale(
+            this.skillButtonMetrics.scale.x * hudScale,
+            this.skillButtonMetrics.scale.y * hudScale,
+            this.skillButtonMetrics.scale.z
+        );
+    }
+
+    private applyVictoryOverlayLayout(
+        visibleWidth: number,
+        visibleHeight: number,
+        panelScale: number
+    ): void {
+        if (!this.victoryOverlayController) {
+            return;
+        }
+
+        const dimmerNode = this.victoryOverlayController.dimmerOpacity?.node ?? null;
+        const dimmerTransform = dimmerNode?.getComponent(UITransform) ?? null;
+        if (dimmerTransform) {
+            dimmerTransform.setContentSize(visibleWidth, visibleHeight);
+        }
+
+        const panelNode = this.victoryOverlayController.panelNode;
+        if (!panelNode || !this.victoryPanelMetrics) {
+            return;
+        }
+
+        panelNode.setPosition(this.victoryPanelMetrics.position);
+        panelNode.setScale(
+            this.victoryPanelMetrics.scale.x * panelScale,
+            this.victoryPanelMetrics.scale.y * panelScale,
+            this.victoryPanelMetrics.scale.z
+        );
+    }
+
+    private clampValue(value: number, minimum: number, maximum: number): number {
+        return Math.max(minimum, Math.min(maximum, value));
+    }
+
+    private enforceLandscapeOrientation(): void {
+        if (!sys.isMobile) {
+            return;
+        }
+
+        view.setOrientation(macro.ORIENTATION_LANDSCAPE);
     }
 }

@@ -52,6 +52,10 @@ export class VictoryOverlayController extends Component {
         this.node.active = true;
         this.ctaButtonController?.setInteractionEnabled(true);
 
+        if (this.panelNode) {
+            this.basePanelScale.set(this.panelNode.scale);
+        }
+
         if (this.dimmerOpacity) {
             this.dimmerOpacity.opacity = 0;
         }

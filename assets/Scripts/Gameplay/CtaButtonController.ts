@@ -5,6 +5,9 @@ const { ccclass, property } = _decorator;
 @ccclass('CtaButtonController')
 export class CtaButtonController extends Component {
     @property
+    public restartSceneName = 'Game';
+
+    @property
     public pressScaleMultiplier = 0.94;
 
     @property
@@ -39,6 +42,8 @@ export class CtaButtonController extends Component {
     }
 
     public playShowAnimation(): void {
+        this.baseScale.set(this.node.scale);
+
         if (this.showTween) {
             this.showTween.stop();
         }
@@ -60,6 +65,7 @@ export class CtaButtonController extends Component {
         }
 
         this.isInteractionEnabled = false;
+        this.baseScale.set(this.node.scale);
 
         if (this.pressTween) {
             this.pressTween.stop();
@@ -82,11 +88,12 @@ export class CtaButtonController extends Component {
 
     private restartCurrentScene(): void {
         const currentScene = director.getScene();
+        const sceneName = currentScene?.name || this.restartSceneName;
 
-        if (!currentScene) {
+        if (!sceneName) {
             return;
         }
 
-        director.loadScene(currentScene.name);
+        director.loadScene(sceneName);
     }
 }
